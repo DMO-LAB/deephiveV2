@@ -1,0 +1,1 @@
+from environment.observation_schemes.default_scheme import DefaultObservationScheme

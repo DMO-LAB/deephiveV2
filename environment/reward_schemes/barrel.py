@@ -1,0 +1,3 @@
+from environment.reward_schemes.full_reward import FullRewardScheme
+from environment.reward_schemes.sparse_reward import SparseRewardScheme
+from environment.reward_schemes.custom_reward import CustomRewardScheme
