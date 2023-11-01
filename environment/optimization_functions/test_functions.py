@@ -1,7 +1,7 @@
 from environment.optimization_functions import OptimizationFunctionBase
 import numpy as np
 from environment.commons.heat_exchanger import HeatExchanger, params
-from environment.commons.objective_functions import sphere_function, cosine_mixture
+from environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function
 from typing import Tuple, Callable, Dict, Any
 
 
@@ -50,3 +50,30 @@ class CosineMixtureFunction(OptimizationFunctionBase):
     
     def optimal_value(self) -> float:
         return 0.2
+    
+class AckleyFunction(OptimizationFunctionBase):
+    def __init__(self):
+        pass
+
+    def evaluate(self, params: np.ndarray) -> np.ndarray:
+        return ackley_function(params)
+
+    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-5, -5]), np.array([5, 5])
+    
+    def optimal_value(self) -> float:
+        return 0
+    
+
+class RosenbrockFunction(OptimizationFunctionBase):
+    def __init__(self):
+        pass
+
+    def evaluate(self, params: np.ndarray) -> np.ndarray:
+        return rosenbrock_function(params)
+
+    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-5, -5]), np.array([5, 5])
+    
+    def optimal_value(self) -> float:
+        return 0

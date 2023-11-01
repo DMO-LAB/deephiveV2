@@ -6,16 +6,20 @@ from torch.distributions import MultivariateNormal
 from typing import List, Tuple, Optional
 from torch import nn
 # set device for mps
-if not torch.backends.mps.is_available():
-    if not torch.backends.mps.is_built():
-        print("MPS not available because the current PyTorch install was not "
-              "built with MPS enabled.")
-    else:
-        print("MPS not available because the current MacOS version is not 12.3+ "
-              "and/or you do not have an MPS-enabled device on this machine.")
-else:
-    device = torch.device("mps")
+# if not torch.backends.mps.is_available():
+#     if not torch.backends.mps.is_built():
+#         print("MPS not available because the current PyTorch install was not "
+#               "built with MPS enabled.")
+# else:
+    # use cuda if available
+if torch.cuda.is_available():
+    device = torch.device("cuda")
     print(f"Using device: {device}")
+else:
+    device = torch.device("cpu")
+    print(f"Using device: {device}")
+    
+
 
 from environment.utils import parse_config
 random_seed = 47
@@ -207,8 +211,8 @@ class MAPPO:
         self.policy = ActorCritic(self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size, std_min=self.std_min,
                                 std_max=self.std_max, std_type=self.std_type, learn_std=self.learn_std).to(self.device)
         
-        if self.initialization is not None:
-            self.policy.apply(init_weights)
+        # if self.initialization is not None:
+        #     self.policy.apply(init_weights)
         if self.pretrained:
             pretrained_model = torch.load(
                 self.ckpt_folder, map_location=lambda storage, loc: storage)
@@ -246,6 +250,7 @@ class MAPPO:
         
     def decay_action_std(self, action_std_decay_rate, min_action_std=0.001, learn_std=False):
         if learn_std:
+            print(f"not decaying action std because learn_std is set to {learn_std}")
             pass
         else:
             self.action_std = self.action_std - action_std_decay_rate

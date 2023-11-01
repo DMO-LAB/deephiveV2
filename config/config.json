@@ -4,7 +4,7 @@
     "n_dim": 2,
     "ep_length": 25,
     "init_state": null,
-    "opt_bound": 0.6,
+    "opt_bound": 0.9,
     "reward_type": "full",
     "freeze": true,
     "opt_value": 0.2,
@@ -12,26 +12,27 @@
     "reward_scheme": "FullRewardScheme",
     "objective_function": "CosineMixtureFunction",
     "optimization_type": "maximize",
-    "use_gbest": true,
+    "use_gbest": false,
     "use_optimal_value": true,
 
-    "lr": 0.001,
+    "lr": 0.0001,
     "lr_decay": 0.0,
     "beta": 0.9,
     "gamma": 0.99,
     "K_epochs":32,
     "eps_clip": 0.2,
-    "action_std": 0.02,
+    "action_std": 0.1,
     "action_dim": 1,
-    "obs_dim": 6,
-    "layer_size":[32,32],
+    "obs_dim": 8,
+    "layer_size":[8,8],
     "std_min": 0.02,
     "std_max": 0.2,
     "std_type": "linear_decay",
-    "learn_std": true,
+    "learn_std": false,
     "pretrained": false,
     "ckpt_folder": "checkpoints",
-    "initialization": "xavier_normal"
+    "initialization": "xavier_normal",
+    "decay_rate":0.01
 
 }
 

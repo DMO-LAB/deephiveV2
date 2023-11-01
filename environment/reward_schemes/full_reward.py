@@ -24,10 +24,11 @@ class FullRewardScheme(RewardScheme):
             
         reward = 10*(self.env.state[:, -1] - self.env.prev_state[:, -1])
         # give agents that improved an additional reward of 1
-        reward[reward > 0] += 1
+        reward[reward < 0] -= 2
         # add the inverse of the distance between the agents and the best agent (the best agent has a value of 1)
         #reward +=  self.env.state[:, -1]
         reward = self._post_process_rewards(reward)
+        reward += -np.log(1 - self.env.state[:, -1] + 0.001)
         return reward
     
     def _post_process_rewards(self, reward):
@@ -41,7 +42,6 @@ class FullRewardScheme(RewardScheme):
         for agent in stuck_agents:
             if self.env.prev_state[agent, -1] == self.env.state[agent, -1]:
                 reward[agent] = self.stuck_reward
-                #print(f"agent {agent} is stuck - reward: {reward[agent]}")
             else:
                 pass
         
@@ -49,10 +49,11 @@ class FullRewardScheme(RewardScheme):
         optimal_agents = self.env._get_optimal_agents()
         
         if len(optimal_agents) > 0:
-            #print(f"Optimal agents: {optimal_agents}"
-            reward[optimal_agents] =+ self.env.state[optimal_agents, -1] * self.optimal_reward
-            #print("Optimal agents: ", optimal_agents, "Reward: ", reward[optimal_agents])
-            #print("Optimal agents: ", optimal_agents, "Reward: ", reward[optimal_agents])
+            reward[optimal_agents] += self.env.state[optimal_agents, -1] * self.optimal_reward
+            if len(optimal_agents) == self.env.n_agents/2:
+                print(f"{len(optimal_agents)} agents are optimal - reward is doubled")
+                print(f"Optimal agents: {optimal_agents} - reward: {reward[optimal_agents]}")
+                reward[optimal_agents] *= 2
         
         # Freeze best agent
         if self.env.freeze:

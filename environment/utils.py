@@ -6,7 +6,7 @@ import numpy as np
 # set figure size, dpi and fontsize
 plt.rcParams['figure.figsize'] = [10, 10]
 plt.rcParams['figure.dpi'] = 300
-plt.rcParams['font.size'] = 14
+plt.rcParams['font.size'] = 12
 
 
 
@@ -113,7 +113,7 @@ class Render:
         ax.set_title("Particle positions")
         state = self.env._get_actual_state()
         # use triangles to for the shape of the particles
-        ax.scatter(state[:, 0], state[:, 1], c="red", s=500, marker="^", edgecolors="black")
+        ax.scatter(state[:, 0], state[:, 1], c="red", s=100, marker="^", edgecolors="black")
         plt.savefig("test.png")
         plt.show()
         
@@ -158,7 +158,7 @@ class Render:
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_title("Particle positions")
-        scat = ax.scatter([], [], c="red", s=300, marker="^", edgecolors="black")
+        scat = ax.scatter([], [], c="red", s=100, marker="^", edgecolors="black")
         # add a text box to display the iteration number
         text = ax.text(0.05, 0.95, "", transform=ax.transAxes)
         

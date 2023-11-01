@@ -117,8 +117,6 @@ class OptimizationEnv(gym.Env):
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
         return observation
     
-    # def confirm_action_addition(self, action: np.ndarray) -> bool:
-    
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
         """
         Run one time step of the environment's dynamics.
@@ -129,10 +127,7 @@ class OptimizationEnv(gym.Env):
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
         # apply the action to the state
         self.state[:, :-1] += action
-        # for agent in range(self.n_agents):
-        #     # print state before and after action
-        #     print(f"Agent: {agent}, State before action: {self.prev_state[agent]}, State after action: {self.state[agent]}, Action: {action[agent]}")
-        # # do not update the best agent position if the environment is frozen
+
         # # if best_agent does not improve, then freeze the best agent
         if self.freeze:
             self.state[self.best_agent, :-1] -= action[self.best_agent]
@@ -256,9 +251,6 @@ class OptimizationEnv(gym.Env):
                 low=self.low[0][:-1], high=self.high[0][:-1], size=(self.n_agents, self.n_dim)), decimals=2)
         # get the objective value of the initial position
         self.obj_values = self.objective_function.evaluate(params=init_pos)
-        # # scale the position to [0, 1]
-        # init_pos = self.scaler_helper.scale(
-        #     init_pos, self.min_pos, self.max_pos)
         # combine the position and objective value
         init_obs = np.append(init_pos, self.obj_values.reshape(-1, 1), axis=1)
         return init_obs
@@ -298,17 +290,6 @@ class OptimizationEnv(gym.Env):
                 raise ValueError("optimization_type should be either 'minimize' or 'maximize'")
             
         _update()
-        # if the environment is 70% stuck, then randomly generate new positions for the stuck agents
-        # if self.current_step >= 3:
-        #     stuck_agents = self._get_stuck_agents()
-        #     if len(stuck_agents) > .5 * self.n_agents:
-        #         print(f"{len(stuck_agents)} agents are stuck, generating new positions for them")                
-        #         self.state[stuck_agents, :-1] = np.round(np.random.uniform(
-        #             low=self.low[0][:-1], high=self.high[0][:-1], size=(len(stuck_agents), self.n_dim)), decimals=4)
-        #         self.obj_values[stuck_agents] = self.objective_function.evaluate(
-        #             params=self.state[stuck_agents, :-1])
-        #         _update()
-                
         self.state[:, :-1] = self.scaler_helper.scale(
             self.state[:, :-1], self.min_pos, self.max_pos)
         self.state[:, -1] = self.scaler_helper.scale(
