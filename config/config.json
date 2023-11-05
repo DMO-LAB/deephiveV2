@@ -1,8 +1,8 @@
 {
     "env_name": "OptimizationEnv",
-    "n_agents": 10,
-    "n_dim": 2,
-    "ep_length": 25,
+    "n_agents": 20,
+    "n_dim": 3,
+    "ep_length": 200,
     "init_state": null,
     "opt_bound": 0.9,
     "reward_type": "full",
@@ -21,18 +21,30 @@
     "gamma": 0.99,
     "K_epochs":32,
     "eps_clip": 0.2,
-    "action_std": 0.1,
+    "action_std": 0.3,
     "action_dim": 1,
-    "obs_dim": 8,
-    "layer_size":[8,8],
+    "obs_dim": 9,
+    "layer_size":[16,16],
     "std_min": 0.02,
-    "std_max": 0.2,
+    "std_max": 0.3,
+    "test_action_std": 0.05,
     "std_type": "linear_decay",
     "learn_std": false,
     "pretrained": false,
     "ckpt_folder": "checkpoints",
     "initialization": "xavier_normal",
-    "decay_rate":0.01
+    "decay_rate":0.01,
+
+
+    "pso_omega": 0.9,
+    "pso_phip": 0.9,
+    "pso_phig": 0.9,
+    "pso_minimize": false,
+    "pso_normalize": true,
+    "pso_use_net" : false,
+    "pso_minfunc": 1e-8,
+    "pso_minstep": 1e-8
+
 
 }
 

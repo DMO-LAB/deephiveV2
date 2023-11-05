@@ -5,3 +5,7 @@ test.png
 *.pth
 *.gif
 .DS_Store
+benchmarking_runs
+testing_runs
+training_runs
+.env

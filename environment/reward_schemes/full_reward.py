@@ -50,7 +50,7 @@ class FullRewardScheme(RewardScheme):
         
         if len(optimal_agents) > 0:
             reward[optimal_agents] += self.env.state[optimal_agents, -1] * self.optimal_reward
-            if len(optimal_agents) == self.env.n_agents/2:
+            if len(optimal_agents) >= self.env.n_agents/2:
                 print(f"{len(optimal_agents)} agents are optimal - reward is doubled")
                 print(f"Optimal agents: {optimal_agents} - reward: {reward[optimal_agents]}")
                 reward[optimal_agents] *= 2

@@ -20,7 +20,7 @@ class HeatExchangerFunction(OptimizationFunctionBase):
     def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([0.015, 0.1, 0.05]), np.array([0.051, 1.5, 0.5])
     
-    def optimal_value(self) -> float:
+    def optimal_value(self, dim) -> float:
         return None
     
     
@@ -31,11 +31,11 @@ class SphereFunction(OptimizationFunctionBase):
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         return sphere_function(params)
 
-    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-5, -5]), np.array([5, 5])
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
     
-    def optimal_value(self) -> float:
-        return 0
+    def optimal_value(self, dim) -> float:
+        return 0 * dim
     
 
 class CosineMixtureFunction(OptimizationFunctionBase):
@@ -45,11 +45,11 @@ class CosineMixtureFunction(OptimizationFunctionBase):
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         return cosine_mixture(params)
 
-    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-1, -1]), np.array([1, 1])
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-1 for _ in range(dim)]), np.array([1 for _ in range(dim)])
     
-    def optimal_value(self) -> float:
-        return 0.2
+    def optimal_value(self, dim) -> float:
+        return 0.1 * dim
     
 class AckleyFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -58,11 +58,11 @@ class AckleyFunction(OptimizationFunctionBase):
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         return ackley_function(params)
 
-    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-5, -5]), np.array([5, 5])
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
     
-    def optimal_value(self) -> float:
-        return 0
+    def optimal_value(self, dim) -> float:
+        return 0 * dim
     
 
 class RosenbrockFunction(OptimizationFunctionBase):
@@ -72,8 +72,8 @@ class RosenbrockFunction(OptimizationFunctionBase):
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         return rosenbrock_function(params)
 
-    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-5, -5]), np.array([5, 5])
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
     
-    def optimal_value(self) -> float:
-        return 0
+    def optimal_value(self, dim) -> float:
+        return 0 * dim

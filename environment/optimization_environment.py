@@ -53,14 +53,14 @@ class OptimizationEnv(gym.Env):
             self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "environment.optimization_functions"), self.config["objective_function"])()
             self.n_agents = self.config["n_agents"]
             self.n_dim = self.config["n_dim"]
-            self.bounds:Tuple[np.ndarray] = self.objective_function.bounds()
+            self.bounds:Tuple[np.ndarray] = self.objective_function.bounds(self.n_dim)
             self.ep_length = self.config["ep_length"]
             self.init_state = self.config["init_state"]
             self.opt_bound = self.config["opt_bound"]
             self.reward_type = self.config["reward_type"]
             self.freeze = self.config["freeze"]
             self.optimization_type: str = self.config["optimization_type"] # optimization type: "minimize" or "maximize"
-            self.opt_value = self.objective_function.optimal_value()
+            self.opt_value = self.objective_function.optimal_value(self.n_dim)
             self.observation_schemes: ObservationScheme = getattr(importlib.import_module(".barrel", "environment.observation_schemes"), self.config["observation_scheme"])(self)
             self.reward_schemes:RewardScheme = getattr(importlib.import_module(".barrel", "environment.reward_schemes"), self.config["reward_scheme"])(self)
             self.scaler_helper = ScalingHelper()
@@ -266,12 +266,12 @@ class OptimizationEnv(gym.Env):
             state = self.state.copy()
             obj_value = self.obj_values.copy()
             actual_state = self.scaler_helper.rescale(
-                state[:, :2], self.min_pos, self.max_pos)
+                state[:, :self.n_dim], self.min_pos, self.max_pos)
             actual_state = np.append(
                 actual_state, obj_value.reshape(-1, 1), axis=1)
         else:
             actual_state = self.scaler_helper.rescale(
-                state[:, :2], self.min_pos, self.max_pos)
+                state[:, :self.n_dim], self.min_pos, self.max_pos)
             actual_state = np.append(
                 actual_state, self.objective_function.evaluate(params=actual_state).reshape(-1, 1), axis=1)
         return actual_state
@@ -282,10 +282,12 @@ class OptimizationEnv(gym.Env):
                 self.best_obj_value = min(np.min(self.obj_values), self.best_obj_value)
                 self.worst_obj_value = max(np.max(self.obj_values), self.worst_obj_value)
                 self.best_agent = np.argmin(self.obj_values)
+                self.best_agent_value = np.min(self.obj_values)
             elif self.optimization_type == "maximize":
                 self.best_obj_value = max(np.max(self.obj_values), self.best_obj_value)
                 self.worst_obj_value = min(np.min(self.obj_values), self.worst_obj_value)
                 self.best_agent = np.argmax(self.obj_values)
+                self.best_agent_value = np.max(self.obj_values)
             else:
                 raise ValueError("optimization_type should be either 'minimize' or 'maximize'")
             
@@ -303,12 +305,12 @@ class OptimizationEnv(gym.Env):
         actual_state = self._get_actual_state().copy()
         if self.optimization_type == "minimize":
             condition = (self.obj_values < self.pbest[:, -1])[:, None]  # Reshape to (5, 1)
-            condition = np.repeat(condition, 3, axis=1)  # Repeat columns to match shape (5, 3)
+            condition = np.repeat(condition, self.n_dim+1, axis=1)  # Repeat columns to match shape (5, 3)
             self.pbest = np.where(condition, actual_state, self.pbest)
             self.gbest = self.pbest[np.argmin(self.pbest[:, -1])]
         elif self.optimization_type == "maximize":
             condition = (self.obj_values > self.pbest[:, -1])[:, None]  # Reshape to (5, 1)
-            condition = np.repeat(condition, 3, axis=1)  # Repeat columns to match shape (5, 3)
+            condition = np.repeat(condition, self.n_dim+1, axis=1)  # Repeat columns to match shape (5, 3)
             self.pbest = np.where(condition, actual_state, self.pbest)
             self.gbest = self.pbest[np.argmax(self.pbest[:, -1])]
         else:

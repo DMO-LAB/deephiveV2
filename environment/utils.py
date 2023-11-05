@@ -4,8 +4,8 @@ from matplotlib import animation
 import numpy as np
 
 # set figure size, dpi and fontsize
-plt.rcParams['figure.figsize'] = [10, 10]
-plt.rcParams['figure.dpi'] = 300
+plt.rcParams['figure.figsize'] = [7, 7]
+plt.rcParams['figure.dpi'] = 80
 plt.rcParams['font.size'] = 12
 
 
@@ -144,7 +144,7 @@ class Render:
             return scat,
         
         anim = animation.FuncAnimation(fig, animate, frames=len(self.env.state_history), interval=1000/fps, blit=True)
-        anim.save(file_path, writer="ffmpeg")
+        anim.save(file_path, writer="Pillow")
         
     def _render_state_history_2d(self, file_path: str, fps: int):
         fig, ax = plt.subplots()
@@ -168,6 +168,6 @@ class Render:
             return scat,
         
         anim = animation.FuncAnimation(fig, animate, frames=self.env.state_history.shape[1], interval=1000/fps, blit=True)
-        anim.save(file_path, writer="ffmpeg")
+        anim.save(file_path, writer="Pillow")
             
     

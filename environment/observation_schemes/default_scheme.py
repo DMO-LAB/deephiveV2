@@ -53,7 +53,7 @@ class DefaultObservationScheme(ObservationScheme):
     def _get_obs_for_dim(self, agent, agent_nb, dim, pbest, gbest, use_gbest):
         obs = [ #self.env.state[agent][dim],
                 self.env.state[agent][self.env.n_dim],
-                #(self.env.state[agent][dim] - self.env.prev_state[agent][dim]),
+                (self.env.state[agent][dim] - self.env.prev_state[agent][dim]),
                 (self.env.state[agent][self.env.n_dim] - self.env.prev_state[agent][self.env.n_dim]),
                 (self.env.state[agent][dim] - pbest[agent][dim]),
                 (self.env.state[agent][self.env.n_dim] - pbest[agent][self.env.n_dim]),
