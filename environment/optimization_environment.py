@@ -229,16 +229,19 @@ class OptimizationEnv(gym.Env):
         Returns:
             optimal_agents: list of agents that are optimal
         """
-        if self.optimization_type == "minimize":
-            optimal_agents = np.where(
-                self.obj_values <= self.opt_value * (1+self.opt_bound))[0]
-        elif self.optimization_type == "maximize":
-            optimal_agents = np.where(
-                self.obj_values >= self.opt_value * self.opt_bound)[0]
+        if self.use_optimal_value:
+            if self.optimization_type == "minimize":
+                optimal_agents = np.where(
+                    self.obj_values <= self.opt_value * (1+self.opt_bound))[0]
+            elif self.optimization_type == "maximize":
+                optimal_agents = np.where(
+                    self.obj_values >= self.opt_value * self.opt_bound)[0]
+            else:
+                raise ValueError("optimization_type should be either 'minimize' or 'maximize'")
+            return optimal_agents
         else:
-            raise ValueError("optimization_type should be either 'minimize' or 'maximize'")
-        return optimal_agents
-    
+            return []
+        
     def _generate_init_state(self):
         """ Generate a random initial state for all agents
         Returns:
@@ -273,7 +276,7 @@ class OptimizationEnv(gym.Env):
             actual_state = self.scaler_helper.rescale(
                 state[:, :self.n_dim], self.min_pos, self.max_pos)
             actual_state = np.append(
-                actual_state, self.objective_function.evaluate(params=actual_state).reshape(-1, 1), axis=1)
+                actual_state, self.objective_function.evaluate(params=actual_state).reshape(-1, 1), axis=1) 
         return actual_state
         
     def _update_env_state(self):
@@ -297,6 +300,7 @@ class OptimizationEnv(gym.Env):
         self.state[:, -1] = self.scaler_helper.scale(
             self.obj_values, self.worst_obj_value, self.best_obj_value)
         
+        print(self.state, self.min_pos, self.max_pos, self.worst_obj_value, self.best_obj_value, self.current_step)
         # assert that the normalized state is within the bounds [0, 1]
         assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"
         

@@ -235,3 +235,40 @@ class ParticleSwarmOptimizer:
             # close the animation figure to avoid displaying it below the cell
             plt.close()
             return anim
+
+if __name__ == "__main__":
+    import os
+    import datetime
+    import argparse
+    import json
+    from deephiveV2.environment.optimization_functions.test_functions import SphereFunction
+    from deephiveV2.environment.optimization_functions.test_functions import CosineMixtureFunction
+    from deephiveV2.environment.optimization_functions.test_functions import ShiftedCosineMixtureFunction 
+
+    config_path = "config/config.json"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--n_agents", type=int, default=100)
+    parser.add_argument("--n_dim", type=int, default=2)
+    parser.add_argument("--max_iter", type=int, default=100)
+
+    args = parser.parse_args()
+
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    
+
+    func = CosineMixtureFunction()
+
+    save_dir = f"pso_runs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}/"
+    os.makedirs(save_dir, exist_ok=True)
+    print(func.bounds[0], func.bounds[1])
+    pso_optimizer = ParticleSwarmOptimizer(func=func, lb=func.bounds[0], ub=func.bounds[1], 
+                                        swarmsize=args.n_agents, omega=config["pso_omega"], phip=config["pso_phip"],
+                                            phig=config["pso_phig"], maxiter=args.max_iter, minstep=config["pso_minstep"],
+                                                minfunc=config["pso_minfunc"], debug=False, minimize=config["pso_minimize"],
+                                                normalize=config["pso_normalize"], use_net=config["pso_use_net"],
+                                                net=None)
+        
+
+

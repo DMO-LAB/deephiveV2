@@ -28,7 +28,8 @@ class OptimizationTrainer:
         self.config = parse_config(config_path)
         if mode in ["test", "benchmark"] and model_path is None:
             raise ValueError("Model path must be provided for testing or benchmarking")
-        if model_path:
+        if model_path and mode in ["test", "benchmark"]:
+            print(f"Loading model from {model_path}")
             self.agent_policy.load(model_path)
             self.agent_policy.set_action_std(self.config["test_action_std"])
         # Initialize Neptune logger if necessary
@@ -53,6 +54,10 @@ class OptimizationTrainer:
             actions[:, dim] = action
         return actions
 
+    def print_items(self, **kwargs):
+        for key, value in kwargs.items():
+            print(key, value)
+
     def train_agent(self, n_episodes=None, update_timestep=None, decay_rate=None, log_interval=None, decay_interval=None, save_interval=None, min_action_std=None):
         # if parameters are not provided, use the ones from the config file
         if update_timestep is None:
@@ -67,6 +72,8 @@ class OptimizationTrainer:
             save_interval = self.config["save_interval"]
         if min_action_std is None:
             min_action_std = self.config["min_action_std"]
+        if n_episodes is None:
+            n_episodes = self.config["n_episodes"]
 
         average_returns = []
         training_run_title = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
@@ -137,6 +144,7 @@ class OptimizationTrainer:
             global_best_value = []
             observation_info = self.env.reset()
             start_time = time.time()
+            global_best_value.append(self.env.gbest[-1])
             for step in range(self.env.ep_length):
                 actions = self.get_action(observation_info)
                 observation_info, _, _, info = self.env.step(actions)
@@ -217,7 +225,8 @@ class OptimizationTrainer:
         plt.rcParams["figure.autolayout"] = True
         plt.fill_between((np.arange(len(mf1))+1)*n_agents, ml1, mh1, alpha=0.1, edgecolor='#3F7F4C', facecolor='#7EFF99')
         plt.plot((np.arange(len(mf1))+1)*n_agents, mf1, linewidth=2.0, label = label, color='#3F7F4C')
-        plt.plot((np.arange(len(mf1))+1)*n_agents, np.ones(len(mf1))*opt_value, linewidth=1.0, label = 'True OPT', color='#CC4F1B')
+        if opt_value is not None:
+            plt.plot((np.arange(len(mf1))+1)*n_agents, np.ones(len(mf1))*opt_value, linewidth=1.0, label = 'True OPT', color='#CC4F1B')
 
         plt.xlabel('number of function evaluations', fontsize = 14)
         plt.ylabel('best fitness value', fontsize = 14)
@@ -279,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="train")
     parser.add_argument('--log', type=bool, default=False, help='log to neptune')
     parser.add_argument("--model_path", type=str, default=None)
-    parser.add_argument("--tags", type=str, default=None)
+    parser.add_argument("--tags", type=str, default="default run")
     parser.add_argument("--n_episodes", type=int, default=None)
     parser.add_argument("--update_timestep", type=int, default=None)
     parser.add_argument("--decay_rate", type=float, default=None)
@@ -294,6 +303,8 @@ if __name__ == "__main__":
     trainer = OptimizationTrainer(args.config_path, args.mode, args.model_path)
     if args.log:
         trainer.initialize_logger(api_token, args.tags)
+    if args.tags is None:
+        args.tags = f"{args.mode}_RUN"
     if args.mode == "train":
         trainer.train_agent(n_episodes=args.n_episodes, update_timestep=args.update_timestep, decay_rate=args.decay_rate, log_interval=args.log_interval, decay_interval=args.decay_interval, save_interval=args.save_interval, min_action_std=args.min_action_std)
     elif args.mode == "test":
