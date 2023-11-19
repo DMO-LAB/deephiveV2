@@ -1,9 +1,10 @@
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from scipy.stats import multivariate_normal
+from matplotlib import pyplot as plt
 
 class ExplorationModule:
-    def __init__(self, initial_samples, n_components=1, max_samples=None):
+    def __init__(self, initial_samples, n_components=1, max_samples=None, **kwargs):
         """
         Initialize the exploration module with a Gaussian Mixture Model.
 
@@ -17,6 +18,8 @@ class ExplorationModule:
         self.samples = initial_samples
         self.gmm = GaussianMixture(n_components=self.n_components)
         self.gmm.fit(self.samples)
+        self.upper_bound = kwargs.get("upper_bound", 1)
+        self.lower_bound = kwargs.get("lower_bound", -1)
     
     def update_distribution(self, new_samples):
         """
@@ -68,3 +71,24 @@ class ExplorationModule:
         nearest_component = np.argmin(np.linalg.norm(self.gmm.means_ - point, axis=1))
         # Return the variance (diagonal of the covariance matrix) of the nearest component
         return np.diag(self.gmm.covariances_[nearest_component])
+
+    def plot_distribution(self):
+        """
+        Plot the current GMM.
+        """
+        # Create a mesh grid on which to evaluate the GMM
+        x = np.linspace(self.lower_bound, self.upper_bound, 100)
+        y = np.linspace(self.lower_bound, self.upper_bound, 100)
+        X, Y = np.meshgrid(x, y)
+        XY = np.array([X.ravel(), Y.ravel()]).T
+
+        # Evaluate the GMM's probability density function (PDF) on the grid
+        Z = np.exp(self.gmm.score_samples(XY))
+        Z = Z.reshape(X.shape)
+        # Plot the contour
+        plt.contourf(X, Y, Z, levels=50, cmap='viridis')
+        plt.colorbar()
+        plt.title('GMM Contour Plot')
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.show()

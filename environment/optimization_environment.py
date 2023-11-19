@@ -8,6 +8,7 @@ from environment.optimization_functions import OptimizationFunctionBase
 from environment.observation_schemes import ObservationScheme
 from environment.reward_schemes import RewardScheme
 from environment.utils import parse_config, ScalingHelper, Render
+from exploration.gaussian_mixture import ExplorationModule
     
 class OptimizationEnv(gym.Env):
     def __init__(self, config_path: str):
@@ -67,12 +68,13 @@ class OptimizationEnv(gym.Env):
             self.render_helper = Render(self)
             self.use_gbest = self.config["use_gbest"]
             self.use_optimal_value = self.config["use_optimal_value"]
+            self.enforce_good_actions = self.config["enforce_good_actions"]
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
     def _reset_variables(self):
         self.state_history = np.zeros(
-            (self.n_agents, self.ep_length+1, self.n_dim+1))
+            (self.n_agents, self.ep_length+1, self.n_dim+2))
         self.gbest_history = np.zeros((self.ep_length+1, self.n_dim+1))
         self.best_obj_value = np.inf if self.optimization_type == "minimize" else -np.inf
         if self.use_optimal_value:
@@ -114,6 +116,7 @@ class OptimizationEnv(gym.Env):
         self.pbest = self._get_actual_state()
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
+        self.gmm = ExplorationModule(initial_samples=self._get_actual_state()[:, :-1], n_components=1, max_samples=None)
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
         return observation
     
@@ -140,6 +143,13 @@ class OptimizationEnv(gym.Env):
         self.state = self._get_actual_state()
         # evaluate the objective function
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
+
+        if self.enforce_good_actions:
+            # if the action is not good, then revert the action . ie if agent is worse than the previous state then revert the action
+            if self.optimization_type == "minimize":
+                self.state[self.obj_values > self.prev_obj_values, :-1] = self.prev_state[self.obj_values > self.prev_obj_values, :-1]
+            elif self.optimization_type == "maximize":
+                self.state[self.obj_values < self.prev_obj_values, :-1] = self.prev_state[self.obj_values < self.prev_obj_values, :-1]
         
         self.current_step += 1
         self._update_env_state()
@@ -156,6 +166,9 @@ class OptimizationEnv(gym.Env):
         # calculate the info
         info = self._get_info()
         
+        # update the role in the state_history (last column) from the observation_std
+        self.state_history[:, self.current_step, -1] = observation[1][0].flatten()
+
         return observation, reward, agents_done, info
     
     def render(self, type: str = "state",fps=1, file_path: Optional[str] = None):
@@ -167,6 +180,8 @@ class OptimizationEnv(gym.Env):
             self.render_helper.render_state()
         elif type == "history":
             self.render_helper.render_state_history(file_path=file_path, fps=fps)
+            # save the state history in the file_path after rendering, in the same folder as the video
+            #np.save(file_path[:-4], self.state_history)
         
         
     def _check_boundary_violations(self) -> np.ndarray:
@@ -300,7 +315,7 @@ class OptimizationEnv(gym.Env):
         self.state[:, -1] = self.scaler_helper.scale(
             self.obj_values, self.worst_obj_value, self.best_obj_value)
         
-        print(self.state, self.min_pos, self.max_pos, self.worst_obj_value, self.best_obj_value, self.current_step)
+        #print(self.state, self.min_pos, self.max_pos, self.worst_obj_value, self.best_obj_value, self.current_step)
         # assert that the normalized state is within the bounds [0, 1]
         assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"
         
@@ -321,7 +336,7 @@ class OptimizationEnv(gym.Env):
             raise ValueError("optimization_type should be either 'minimize' or 'maximize'")
         self.gbest_history[self.current_step, :] = self.gbest
         
-        self.state_history[:, self.current_step, :] = self._get_actual_state()
+        self.state_history[:, self.current_step, :self.n_dim+1] = self._get_actual_state()
 
     def _get_stuck_agents(self, threshold: int = 2) -> List[int]:
         """
@@ -346,7 +361,7 @@ class OptimizationEnv(gym.Env):
         if self.current_step > 3:
             for agent in range(self.n_agents):
                 # Get the objective values from state_history for the specified range of steps
-                past_obj_values = self.state_history[agent, start_step:end_step, -1]
+                past_obj_values = self.state_history[agent, start_step:end_step, -2]
                 
                 # Check if the objective values have not changed over the threshold time steps
                 if np.all(past_obj_values == past_obj_values[0]) and agent != self.best_agent:

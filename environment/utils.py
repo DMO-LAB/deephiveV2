@@ -9,7 +9,6 @@ plt.rcParams['figure.dpi'] = 80
 plt.rcParams['font.size'] = 12
 
 
-
 class ScalingHelper:
     """
     A class that provides methods for scaling and rescaling values.
@@ -163,8 +162,10 @@ class Render:
         text = ax.text(0.05, 0.95, "", transform=ax.transAxes)
         
         def animate(i):
-            scat.set_offsets(self.env.state_history[:, i, :])
+            scat.set_offsets(self.env.state_history[:, i, :-1])
             text.set_text(f"Iteration: {i}")
+            # use different colors for the particles based on their role - red for closer half, blue for farther half
+            scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -1]])
             return scat,
         
         anim = animation.FuncAnimation(fig, animate, frames=self.env.state_history.shape[1], interval=1000/fps, blit=True)

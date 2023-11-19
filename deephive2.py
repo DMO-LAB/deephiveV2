@@ -155,13 +155,14 @@ class OptimizationTrainer:
             duration += end_time - start_time
             global_best_values.append(global_best_value)
             optimal_positions.append(self.env.gbest)
-            # if neptune_logger:
-            #     neptune_logger[f"test/global_best_value/iteration_{i}"].upload(File.as_image(np.array(info["gbest"])))
             if i % log_interval == 0 and self.env.n_dim <= 2:
                 self.env.render(file_path=f"{save_path}{i}.gif", type="history")
                 if self.neptune_logger:
                     self.neptune_logger[f"test/gifs/{i}.gif"].upload(f"{save_path}{i}.gif")
-            
+        
+            # save gbest history as npy
+            np.save(f"{save_path}gbest_history_{i}.npy", self.env.gbest_history)   
+
         # plot the global best values
         save_dir = f"{save_path}num_function_evaluations.png"
         #plot_num_function_evaluation([global_best_values], env.n_agents, save_dir, opt_value=env.objective_function.optimal_value(),  show_std=True)
@@ -194,7 +195,7 @@ class OptimizationTrainer:
         labels = ["PSO", "DeepHive"]
         colors = ["#3F7F4C", "#CC4F1B"]
         self.plot_num_function_evaluation(opts, self.env.n_agents, f"{save_dir}num_function_evaluations_benchmark.png", label_list=labels, color_list=colors, 
-                                          opt_value=self.env.objective_function.optimal_value(self.env.n_dim), symbol_list=['-', '--'])
+                                          opt_value=self.env.objective_function.optimal_value(self.env.n_dim), symbol_list=['-', '-'])
         if self.neptune_logger:
             self.neptune_logger[f"test/num_function_evaluations"].upload(f"{save_dir}num_function_evaluations_benchmark.png")
 
@@ -306,7 +307,7 @@ if __name__ == "__main__":
     if args.tags is None:
         args.tags = f"{args.mode}_RUN"
     if args.mode == "train":
-        trainer.train_agent(n_episodes=args.n_episodes, update_timestep=args.update_timestep, decay_rate=args.decay_rate, log_interval=args.log_interval, decay_interval=args.decay_interval, save_interval=args.save_interval, min_action_std=args.min_action_std)
+        trainer.train_agent(n_episodes=args.n_episodes, update_timestep=args.update_timestep, decay_rate=args.decay_rate, log_interval=None, decay_interval=args.decay_interval, save_interval=args.save_interval, min_action_std=args.min_action_std)
     elif args.mode == "test":
         trainer.test_policy(n_iterations=args.iters, log_interval=args.log_interval)
     elif args.mode == "benchmark":

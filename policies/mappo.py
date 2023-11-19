@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 from typing import List, Tuple, Optional
 from torch import nn
+
 # set device for mps
 # if not torch.backends.mps.is_available():
 #     if not torch.backends.mps.is_built():
@@ -12,14 +13,13 @@ from torch import nn
 #               "built with MPS enabled.")
 # else:
     # use cuda if available
+
 if torch.cuda.is_available():
     device = torch.device("cuda")
     print(f"Using device: {device}")
 else:
     device = torch.device("cpu")
     print(f"Using device: {device}")
-    
-
 
 from environment.utils import parse_config
 random_seed = 47
@@ -85,21 +85,8 @@ class ActorCritic(nn.Module):
         self.std_max = std_max
         self.std_type = std_type
         self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)   #action_std is a constant
+        self.init_action_std = action_std_init
           
-
-        def direct_std(dist: np.ndarray) -> np.ndarray:
-            std = dist + 0.001
-            return std
-
-        def linear_decay(dist: np.ndarray) -> np.ndarray:
-            
-            return self.std_min + (self.std_max - self.std_min) * dist
-        
-        self.stds_formula = {
-            'direct_decay': direct_std,
-            'linear_decay': linear_decay,
-        }
-
     def set_action_std(self, new_action_std : float):
                 self.action_var = torch.full(
                     (self.action_dim,), new_action_std * new_action_std).to(device)
@@ -107,12 +94,34 @@ class ActorCritic(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def get_std(self, dist:np.ndarray) -> torch.Tensor:
-        #print(f"dist: {dist}")
-        std = self.stds_formula[self.std_type](dist=dist)
-        #print(f"std: {std}")
-        action_var = torch.from_numpy(std).to(device)
-        return action_var
+    # def get_std(self, dist:np.ndarray) -> torch.Tensor:
+    #    # dist is an array of binary values (1,0) indicating whether the agent is an explorer or exploiter
+    #    # if 1, then the agent is an explorer and the std is set to init_action_std
+    #    # if 0, then the agent is an exploiter and the std is set to 1/10th of init_action_std
+    #     action_stds = []
+    #     for i in range(len(dist)):
+    #         if dist[i] == 0:
+    #             action_stds.append(self.init_action_std)
+    #         else:
+    #             action_stds.append(self.init_action_std/10)
+        
+    #     action_stds = np.array(action_stds)
+    #     print(f"action_stds: {action_stds}")
+    #     action_stds = torch.from_numpy(action_stds).float().to(device)
+    #     action_vars = action_stds.pow(2)
+    #     return action_vars
+
+    def get_std(self, dist: np.ndarray) -> torch.Tensor:
+        action_stds = []
+        for d in dist:
+            std_value = self.std_max if d == 0 else self.std_min
+            action_stds.append(std_value)
+        
+        action_stds = np.array(action_stds)
+        action_stds = torch.from_numpy(action_stds).float().to(device)
+        action_vars = action_stds.unsqueeze(1).pow(2)  # Ensure shape is (n_agents, 1)
+        return action_vars
+
 
     def act(self, state: torch.Tensor, std_obs: Optional[np.ndarray] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """ 
@@ -133,7 +142,7 @@ class ActorCritic(nn.Module):
             cov_mat = torch.diag(self.action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
         action = dist.sample()
-        #print(f"action: {action}")
+       #print(f"action: {action}")
         action_logprob = dist.log_prob(action)
         return action.detach(), action_logprob.detach()
 

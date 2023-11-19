@@ -1,7 +1,7 @@
 from environment.optimization_functions import OptimizationFunctionBase
 import numpy as np
 from environment.commons.heat_exchanger import HeatExchanger, params
-from environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function
+from environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function, gaussian_peak
 from typing import Tuple, Callable, Dict, Any
 
 
@@ -71,7 +71,7 @@ class SphereFunction(OptimizationFunctionBase):
         return sphere_function(params)
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
+        return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
     
     def optimal_value(self, dim) -> float:
         return 0 * dim
@@ -151,3 +151,16 @@ class RosenbrockFunction(OptimizationFunctionBase):
     
     def optimal_value(self, dim) -> float:
         return 0 * dim
+    
+class GaussianPeakFunction(OptimizationFunctionBase):
+    def __init__(self):
+        pass
+
+    def evaluate(self, params: np.ndarray) -> np.ndarray:
+        return gaussian_peak(params)
+
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-1 for _ in range(dim)]), np.array([1 for _ in range(dim)])
+    
+    def optimal_value(self, dim) -> float:
+        return 4.808
