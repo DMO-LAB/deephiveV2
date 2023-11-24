@@ -112,7 +112,11 @@ class Render:
         ax.set_title("Particle positions")
         state = self.env._get_actual_state()
         # use triangles to for the shape of the particles
-        ax.scatter(state[:, 0], state[:, 1], c="red", s=100, marker="^", edgecolors="black")
+        # plot scatter plot of the novel points with color red and the rest with color blue
+        novel_id = self.env.ids_true_function_eval
+        ax.scatter(state[novel_id, 0], state[novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="novel points")
+        ax.scatter(state[~novel_id, 0], state[~novel_id, 1], c="blue", s=100, marker="^", edgecolors="black", label="non-novel points")
+        
         plt.savefig("test.png")
         plt.show()
         
@@ -157,15 +161,20 @@ class Render:
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_title("Particle positions")
+        ax.legend()
         scat = ax.scatter([], [], c="red", s=100, marker="^", edgecolors="black")
         # add a text box to display the iteration number
         text = ax.text(0.05, 0.95, "", transform=ax.transAxes)
         
         def animate(i):
-            scat.set_offsets(self.env.state_history[:, i, :-1])
+            scat.set_offsets(self.env.state_history[:, i, :-2])
             text.set_text(f"Iteration: {i}")
             # use different colors for the particles based on their role - red for closer half, blue for farther half
-            scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -1]])
+            if self.env.use_surrogate:
+                scat.set_label(["novel" if role == 1 else "non-novel" for role in self.env.state_history[:, i, -2]])
+            else:
+                scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -1]])
+    
             return scat,
         
         anim = animation.FuncAnimation(fig, animate, frames=self.env.state_history.shape[1], interval=1000/fps, blit=True)

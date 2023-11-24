@@ -3,8 +3,6 @@ import numpy as np
 from environment.commons.heat_exchanger import HeatExchanger, params
 from environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function, gaussian_peak
 from typing import Tuple, Callable, Dict, Any
-
-
     
 class HeatExchangerFunction(OptimizationFunctionBase):
     def __init__(self):

@@ -140,6 +140,7 @@ class OptimizationTrainer:
         print(self.agent_policy.action_std, self.agent_policy.policy.action_var)
 
         duration = 0
+        num_function_evaluations = []
         for i in range(n_iterations+1):
             global_best_value = []
             observation_info = self.env.reset()
@@ -151,24 +152,28 @@ class OptimizationTrainer:
                 global_best_value.append(info["gbest"][-1])
                 if self.neptune_logger:
                     self.neptune_logger[f"test/global_best_value/iteration_{i}"].log(float(info["gbest"][-1]))
+            if self.config["use_surrogate"]:
+                self.env.render(file_path=f"{save_path}{i}.png", type="surrogate")
+            num_function_evaluations.append(self.env.num_of_function_evals)
             end_time = time.time()
             duration += end_time - start_time
             global_best_values.append(global_best_value)
             optimal_positions.append(self.env.gbest)
-            if i % log_interval == 0 and self.env.n_dim <= 2:
+            if i % log_interval == 0 and self.env.n_dim <= 2 or self.env.gbest[-1] < 0.8 * self.env.objective_function.optimal_value(self.env.n_dim):
                 self.env.render(file_path=f"{save_path}{i}.gif", type="history")
                 if self.neptune_logger:
                     self.neptune_logger[f"test/gifs/{i}.gif"].upload(f"{save_path}{i}.gif")
         
             # save gbest history as npy
-            np.save(f"{save_path}gbest_history_{i}.npy", self.env.gbest_history)   
+            #np.save(f"{save_path}gbest_history_{i}.npy", self.env.gbest_history)   
 
         # plot the global best values
         save_dir = f"{save_path}num_function_evaluations.png"
         #plot_num_function_evaluation([global_best_values], env.n_agents, save_dir, opt_value=env.objective_function.optimal_value(),  show_std=True)
-        self.num_function_evaluation(global_best_values, self.env.n_agents, save_dir, self.env.objective_function.optimal_value(self.env.n_dim))
+        self.num_function_evaluation(global_best_values, self.env.n_agents, save_dir, self.env.objective_function.optimal_value(self.env.n_dim), num_function_evaluations=num_function_evaluations)
         if self.neptune_logger:
             self.neptune_logger[f"test/num_function_evaluations"].upload(save_dir)
+        print(f"Number of function evaluations: {num_function_evaluations}")
         return global_best_values, optimal_positions, duration
 
     def benchmark_algorithms(self, n_iterations, log_interval=5, net=None):
@@ -214,26 +219,28 @@ class OptimizationTrainer:
         return m, m-h, m+h
 
     @staticmethod
-    def num_function_evaluation(fopt, n_agents, save_dir, opt_value, label="TEST OPT"):
+    def num_function_evaluation(fopt, n_agents, save_dir, opt_value, label="TEST OPT", num_function_evaluations=None):
     # convert fopt to numpy array if it is not already
         fopt = np.array(fopt)
         mf1 = np.mean(fopt, axis = 0)
         err = np.std(fopt, axis = 0)
         mf1, ml1, mh1 = OptimizationTrainer.mean_confidence_interval(fopt,0.95)
+        x = (np.arange(len(mf1))+1)*n_agents if num_function_evaluations is None else np.arange(0, np.mean(num_function_evaluations), np.mean(num_function_evaluations)/len(mf1) )
+        print(f"Number of function evaluations: {len(x)}")
 
         fig = plt.figure(figsize=(6,4), dpi=200)
         plt.rcParams["figure.figsize"] = [6, 4]
         plt.rcParams["figure.autolayout"] = True
-        plt.fill_between((np.arange(len(mf1))+1)*n_agents, ml1, mh1, alpha=0.1, edgecolor='#3F7F4C', facecolor='#7EFF99')
-        plt.plot((np.arange(len(mf1))+1)*n_agents, mf1, linewidth=2.0, label = label, color='#3F7F4C')
+        plt.fill_between(x, ml1, mh1, alpha=0.1, edgecolor='#3F7F4C', facecolor='#7EFF99')
+        plt.plot(x, mf1, linewidth=2.0, label = label, color='#3F7F4C')
         if opt_value is not None:
-            plt.plot((np.arange(len(mf1))+1)*n_agents, np.ones(len(mf1))*opt_value, linewidth=1.0, label = 'True OPT', color='#CC4F1B')
+            plt.plot(x, np.ones(len(mf1))*opt_value, linewidth=1.0, label = 'True OPT', color='#CC4F1B')
 
         plt.xlabel('number of function evaluations', fontsize = 14)
         plt.ylabel('best fitness value', fontsize = 14)
 
         plt.legend(fontsize = 14, frameon=False)
-        plt.xscale('log')
+        #plt.xscale('log')
         plt.yticks(fontsize = 14)
         plt.savefig(save_dir)
         # close the figure

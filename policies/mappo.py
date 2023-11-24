@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 from typing import List, Tuple, Optional
 from torch import nn
+import warnings
+warnings.filterwarnings('ignore')
 
 # set device for mps
 # if not torch.backends.mps.is_available():
@@ -338,5 +340,5 @@ class MAPPO:
         print("Saved policy to: ", filename)
     
     def load(self, filename):
-        self.policy.load_state_dict(torch.load(filename))
+        self.policy.load_state_dict(torch.load(filename, map_location=lambda storage, loc: storage))
         print("Loaded policy from: ", filename)
