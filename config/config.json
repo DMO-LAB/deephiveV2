@@ -16,9 +16,10 @@
     "update_timestep": 25,
     "log_interval": 200,
     "enforce_good_actions": false,
-    "use_surrogate": false,
+    "use_surrogate": true,
     "use_variance":true,
     "variance_threshold": 0.0001,
+
 
     "lr": 0.0001,
     "lr_decay": 0.0,
@@ -30,8 +31,8 @@
     "action_dim": 1,
     "obs_dim": 9,
     "layer_size":[16, 16],
-    "std_min": 0.02,
-    "std_max": 0.5,
+    "std_min": 0.003,
+    "std_max": 0.3,
     "test_action_std": 0.03,
     "std_type": "linear_decay",
     "learn_std": true,

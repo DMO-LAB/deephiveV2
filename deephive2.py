@@ -141,19 +141,24 @@ class OptimizationTrainer:
 
         duration = 0
         num_function_evaluations = []
+        all_gbest_num_evals = {}
         for i in range(n_iterations+1):
             global_best_value = []
             observation_info = self.env.reset()
             start_time = time.time()
+            gbest_num_evals = {}
             global_best_value.append(self.env.gbest[-1])
             for step in range(self.env.ep_length):
                 actions = self.get_action(observation_info)
                 observation_info, _, _, info = self.env.step(actions)
                 global_best_value.append(info["gbest"][-1])
+                gbest_num_evals[self.env.num_of_function_evals] = info["gbest"][-1]
                 if self.neptune_logger:
                     self.neptune_logger[f"test/global_best_value/iteration_{i}"].log(float(info["gbest"][-1]))
-            if self.config["use_surrogate"]:
+            if self.config["use_surrogate"] and i % log_interval == 0:
                 self.env.render(file_path=f"{save_path}{i}.png", type="surrogate")
+                
+            all_gbest_num_evals[f"iteration_{i}"] = gbest_num_evals
             num_function_evaluations.append(self.env.num_of_function_evals)
             end_time = time.time()
             duration += end_time - start_time
@@ -164,9 +169,7 @@ class OptimizationTrainer:
                 if self.neptune_logger:
                     self.neptune_logger[f"test/gifs/{i}.gif"].upload(f"{save_path}{i}.gif")
         
-            # save gbest history as npy
-            #np.save(f"{save_path}gbest_history_{i}.npy", self.env.gbest_history)   
-
+    
         # plot the global best values
         save_dir = f"{save_path}num_function_evaluations.png"
         #plot_num_function_evaluation([global_best_values], env.n_agents, save_dir, opt_value=env.objective_function.optimal_value(),  show_std=True)
@@ -174,6 +177,10 @@ class OptimizationTrainer:
         if self.neptune_logger:
             self.neptune_logger[f"test/num_function_evaluations"].upload(save_dir)
         print(f"Number of function evaluations: {num_function_evaluations}")
+        # save the all_gbest_num_evals to a csv file
+        df = pd.DataFrame.from_dict(all_gbest_num_evals)
+        df.to_csv(f"{save_path}num_function_evaluations.csv")
+        
         return global_best_values, optimal_positions, duration
 
     def benchmark_algorithms(self, n_iterations, log_interval=5, net=None):

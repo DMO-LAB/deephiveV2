@@ -127,7 +127,7 @@ class OptimizationEnv(gym.Env):
         self._update_pbest()
         actual_samples = self._get_actual_state()
         self.ids_true_function_eval = np.arange(self.n_agents)
-        self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=1, max_samples=None)
+        self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=5, max_samples=None)
         if self.use_surrogate:
             self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds)
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
@@ -154,6 +154,7 @@ class OptimizationEnv(gym.Env):
         self.boundary_violating_agents = np.where(self.boundary_violating_agents)[0]
         self.state = np.clip(self.state, np.zeros_like(self.state), np.ones_like(self.state))
         self.state = self._get_actual_state()
+        self.gmm.update_distribution(self.state[:, :-1])
 
         # Evaluate novelty and divide agents
         if self.use_surrogate:
