@@ -36,14 +36,23 @@ class ExplorationModule:
         self.gmm = GaussianMixture(n_components=self.n_components)
         self.gmm.fit(self.samples)
 
-    def sample_candidate_points(self, n_samples):
+    def sample_candidate_points(self, n_samples, exploration_rate=1, random=False):
         """
         Generate new candidate points based on the current GMM.
 
         Parameters:
         - n_samples: Number of candidate points to generate.
         """
-        return self.gmm.sample(n_samples)[0]
+        sample =  self.gmm.sample(n_samples)[0]
+        sample += np.random.normal(0, exploration_rate, sample.shape)
+        # regenerate samples if they are out of bounds
+        while np.any(sample > self.upper_bound) or np.any(sample < self.lower_bound):
+            sample =  self.gmm.sample(n_samples)[0]
+        # if random:
+        if random:
+            sample = np.random.uniform(self.lower_bound, self.upper_bound, sample.shape)
+        return sample
+
 
     def assess_novelty(self, points):
         """

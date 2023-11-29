@@ -75,6 +75,7 @@ class OptimizationEnv(gym.Env):
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.use_variance = self.config["use_variance"] if "use_variance" in self.config else False
             self.variance_threshold = self.config["variance_threshold"] if "variance_threshold" in self.config else 0.001
+            self.random_shuffling_frequency = self.config["random_shuffling_frequency"] if "random_shuffling_frequency" in self.config else 5
             self.debug = self.config["debug"] if "debug" in self.config else False
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
@@ -189,9 +190,19 @@ class OptimizationEnv(gym.Env):
                 most_novel_indices = np.argsort(novelty_scores)[-len(novelty_scores)//2:]  # Half with highest scores
                 less_novel_indices = np.argsort(novelty_scores)[:len(novelty_scores)//2]  # Half with lowest scores
 
+
+            # EVALUATION
+            
             # Evaluate most novel agents using the true function
             self.obj_values[most_novel_indices] = self.objective_function.evaluate(params=self.state[most_novel_indices, :-1])
             self.num_of_function_evals += len(most_novel_indices)
+
+            if self.current_step % self.random_shuffling_frequency == 0:
+                print(f"Randomly generating new sample points for {self.n_agents//2} agents \n")
+                self.random_indices = np.random.choice(np.arange(self.n_agents), size=self.n_agents//2, replace=False)
+                # remove the best agent from the random indices
+                self.random_indices = np.setdiff1d(self.random_indices, self.best_agent)
+                self.state[self.random_indices, :-1] = self.gmm.sample_candidate_points(len(self.random_indices))
 
             # # Evaluate less novel agents using the surrogate
             if len(less_novel_indices) > 0:
@@ -214,8 +225,17 @@ class OptimizationEnv(gym.Env):
             #self.surrogate.update_model(self.state[most_novel_indices, :-1], self.obj_values[most_novel_indices])
 
         else:
+            # randomly generate new sample points from the gmm for half of the agents except the best agent
+            if self.current_step % self.random_shuffling_frequency == 0:
+                print(f"Randomly generating new sample points for {self.n_agents//2} agents \n")
+                self.random_indices = np.random.choice(np.arange(self.n_agents), size=self.n_agents//2, replace=False)
+                # remove the best agent from the random indices
+                self.random_indices = np.setdiff1d(self.random_indices, self.best_agent)
+                self.state[self.random_indices, :-1] = self.gmm.sample_candidate_points(len(self.random_indices), random=True)
+            
             # Standard evaluation if not using surrogate
             self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
+            print(f"Objective values: {self.obj_values} \n")
             self.num_of_function_evals += self.n_agents
 
         # Enforce good actions
