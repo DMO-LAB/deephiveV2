@@ -136,7 +136,7 @@ class ActorCritic(nn.Module):
             action_logprob: Log probability of the action sampled from the policy.
         """
         action_mean = self.actor(state)
-        #print(f"action_mean: {action_mean}")
+        print(f"action_mean: {action_mean}  - state: {state}")    
         if self.learn_std:
             action_var = self.get_std(std_obs) # type: ignore
             dist = tdist.Normal(action_mean, action_var)
@@ -144,7 +144,6 @@ class ActorCritic(nn.Module):
             cov_mat = torch.diag(self.action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
         action = dist.sample()
-       #print(f"action: {action}")
         action_logprob = dist.log_prob(action)
         return action.detach(), action_logprob.detach()
 
@@ -222,8 +221,6 @@ class MAPPO:
         self.policy = ActorCritic(self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size, std_min=self.std_min,
                                 std_max=self.std_max, std_type=self.std_type, learn_std=self.learn_std).to(self.device)
         
-        # if self.initialization is not None:
-        #     self.policy.apply(init_weights)
         if self.pretrained:
             pretrained_model = torch.load(
                 self.ckpt_folder, map_location=lambda storage, loc: storage)

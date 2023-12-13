@@ -71,11 +71,10 @@ class OptimizationEnv(gym.Env):
             self.use_gbest = self.config["use_gbest"]
             self.use_optimal_value = self.config["use_optimal_value"]
             self.enforce_good_actions = self.config["enforce_good_actions"]
-            self.use_gmm = self.config["use_gmm"] if "use_gmm" in self.config else False
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
-            self.use_variance = self.config["use_variance"] if "use_variance" in self.config else False
-            self.variance_threshold = self.config["variance_threshold"] if "variance_threshold" in self.config else 0.001
             self.debug = self.config["debug"] if "debug" in self.config else False
+            self.mode = self.config["mode"] if "mode" in self.config else "exploration"
+            self.gmm_n_components = self.config["gmm_n_components"] if "gmm_n_components" in self.config else 3
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -122,15 +121,24 @@ class OptimizationEnv(gym.Env):
         self.state = self._generate_init_state()
         self._update_env_state()
         self.prev_state = self.state.copy()
+        self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
         self.pbest = self._get_actual_state()
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
         actual_samples = self._get_actual_state()
         self.ids_true_function_eval = np.arange(self.n_agents)
-        self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=5, max_samples=None)
+        self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=self.gmm_n_components, bounds=self.bounds)
+        self.prev_novelty_scores = self.gmm.assess_novelty(self.prev_agents_pos)
         if self.use_surrogate:
             self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds)
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
+            self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)   
+        if self.mode == "exploration":
+            observation = self.observation_schemes.generate_observation()
+        else:
+            observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
+
+
+    
         return observation
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
@@ -139,9 +147,11 @@ class OptimizationEnv(gym.Env):
         """
         assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         self.prev_state = self.state.copy()
+        self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
         self.prev_obj_values = self.obj_values.copy()
+        self.prev_novelty_scores = self.gmm.assess_novelty(self.prev_agents_pos)
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
-        
+        novelty_scores = self.gmm.access_novelty_density(self._get_actual_state()[:, :-1])
         # Apply the action to the state
         self.state[:, :-1] += action
 
@@ -155,93 +165,27 @@ class OptimizationEnv(gym.Env):
         self.state = np.clip(self.state, np.zeros_like(self.state), np.ones_like(self.state))
         self.state = self._get_actual_state()
         self.gmm.update_distribution(self.state[:, :-1])
-
-        # Evaluate novelty and divide agents
         if self.use_surrogate:
-            if self.debug:
-                surr_all, pred_var_all = self.surrogate.evaluate(self.state[:, :-1])
-                obj_values_all = self.objective_function.evaluate(params=self.state[:, :-1])
-                novelty_scores = self.gmm.assess_novelty(self.state[:, :-1])
-                # write this to file for analysis
-                with open("surrogate_predictions.txt", "a") as f:
-                    f.write(f"Current step: {self.current_step} \n")
-                    f.write(f"Surrogate prediction: {surr_all} \n variance: {pred_var_all} \n")
-                    f.write(f"Objective values: {obj_values_all} \n")
-                    f.write(f"Novelty scores: {novelty_scores} \n")
-                    f.write(f"sorted novelty scores: {np.argsort(novelty_scores)} \n")
-                    f.write(f"sorted variance: {np.argsort(pred_var_all)} \n")
-            
-            if self.use_variance:
-                surr_all, pred_var_all = self.surrogate.evaluate(self.state[:, :-1])
-                # less novel is agent with variance less than self.variance_threshold 
-                less_novel_indices = np.where(pred_var_all < self.variance_threshold)[0]
-                most_novel_indices = np.where(pred_var_all >= self.variance_threshold)[0]
-                print(f"{len(less_novel_indices)} agents with variance less than {self.variance_threshold} \n")
-                print(f"{len(most_novel_indices)} agents with variance greater than {self.variance_threshold} \n")
-                if len(most_novel_indices) == 0 and self.current_step < 5:
-                    print("No agents with variance greater than 0.001, early in the episode. Using all agents instead. \n")
-                    most_novel_indices = np.argsort(pred_var_all)[-len(pred_var_all)//2:]
-                    less_novel_indices = np.argsort(pred_var_all)[:len(pred_var_all)//2]
-                
-            else:
-                novelty_scores = self.gmm.assess_novelty(self.state[:, :-1])
-                print(f"Novelty scores: {novelty_scores} \n")
-                most_novel_indices = np.argsort(novelty_scores)[-len(novelty_scores)//2:]  # Half with highest scores
-                less_novel_indices = np.argsort(novelty_scores)[:len(novelty_scores)//2]  # Half with lowest scores
+            self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
 
-            # Evaluate most novel agents using the true function
-            self.obj_values[most_novel_indices] = self.objective_function.evaluate(params=self.state[most_novel_indices, :-1])
-            self.num_of_function_evals += len(most_novel_indices)
+        self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
+        self.num_of_function_evals += self.n_agents
 
-            # # Evaluate less novel agents using the surrogate
-            if len(less_novel_indices) > 0:
-                surr_pred, _ = self.surrogate.evaluate(self.state[less_novel_indices, :-1])
-                #print(f"Surrogate prediction: {surr_pred} \n variance: {pred_var}")
-                self.obj_values[less_novel_indices] = surr_pred
-            
-                # if the any values in the surr_pred is better than the gbest value, then evaluate the true function and add the id to the most_novel_indices
-                better_than_gbest_relative = np.where(surr_pred < self.gbest[-1])[0] if self.optimization_type == "minimize" else np.where(surr_pred > self.gbest[-1])[0]
-                # Map these indices back to the original state array
-                better_than_gbest = less_novel_indices[better_than_gbest_relative]
-                if len(better_than_gbest) > 0:
-                    self.obj_values[better_than_gbest] = self.objective_function.evaluate(params=self.state[better_than_gbest, :-1])
-                    self.num_of_function_evals += len(better_than_gbest)
-                    most_novel_indices = np.append(most_novel_indices, better_than_gbest)
-            
-            # Update the surrogate with the data of the most novel agents
-            if len(most_novel_indices) > 0:
-                self.surrogate.update_model(self.state[most_novel_indices, :-1], self.obj_values[most_novel_indices])
-            #self.surrogate.update_model(self.state[most_novel_indices, :-1], self.obj_values[most_novel_indices])
-
-        else:
-            # Standard evaluation if not using surrogate
-            self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
-            self.num_of_function_evals += self.n_agents
-
-        # Enforce good actions
-        if self.enforce_good_actions:
-            revert_condition = self.obj_values > self.prev_obj_values if self.optimization_type == "minimize" else self.obj_values < self.prev_obj_values
-            self.state[revert_condition, :-1] = self.prev_state[revert_condition, :-1]
-        
         self.current_step += 1
         self._update_env_state()
         self._update_pbest()
         self._update_done_flag()
 
         agents_done = np.array([self.done for _ in range(self.n_agents)])
+        self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
-        info = self._get_info()
-        self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
+        if self.mode == "exploration":
+            observation = self.observation_schemes.generate_observation()
+        else:
+            observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
+            self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
 
-        # Store IDs of agents evaluated by the true function for analysis
-        self.ids_true_function_eval = most_novel_indices if self.use_surrogate else np.arange(self.n_agents)
-        
-        self.ids_true_function_eval_history = np.append(self.ids_true_function_eval_history, self.ids_true_function_eval)
-        
-        novelty = np.zeros_like(self.state[:, -1])
-        novelty[self.ids_true_function_eval] = 1
-        self.state_history[:, self.current_step, -1] = novelty
+        info = self._get_info()
 
         if self.optimization_type == "minimize":
             if np.any(self.obj_values < self.best_obj_value):
@@ -250,9 +194,6 @@ class OptimizationEnv(gym.Env):
             if np.any(self.obj_values > self.best_obj_value):
                 raise ValueError("Objective value is less than the best objective value")
         
-        print(f"Current time {self.current_step} - {self.ep_length}, best obj value: {self.best_obj_value}, best agent: {self.best_agent}, best agent value: {self.best_agent_value}, number of function evals: {self.num_of_function_evals} \n")
-            
-        #print(f"current_step: {self.current_step}, best_obj_value: {self.gbest[-1]}, number of function evals: {self.num_of_function_evals} \n")
         return observation, reward, agents_done, info
 
     
@@ -261,17 +202,20 @@ class OptimizationEnv(gym.Env):
         Args:
             type: type of rendering : "state" or "history"
         """
-        if type == "state":
-            self.render_helper.render_state()
-        elif type == "history":
-            self.render_helper.render_state_history(file_path=file_path, fps=fps)
-        elif type == "gmm":
-            self.gmm.plot_distribution()
-        elif type == "surrogate":
-            self.surrogate.plot_surrogate(save_dir=file_path)
-            # save the state history in the file_path after rendering, in the same folder as the video
-            #np.save(file_path[:-4], self.state_history)
-        
+        try:
+            if type == "state":
+                self.render_helper.render_state()
+            elif type == "history":
+                self.render_helper.render_state_history(file_path=file_path, fps=fps)
+            elif type == "gmm":
+                self.gmm.plot_distribution()
+            elif type == "surrogate":
+                self.surrogate.plot_surrogate(save_dir=file_path)
+            else:
+                raise ValueError("type should be either 'state' or 'history'")
+        except Exception as e:
+            pass
+            
         
     def _check_boundary_violations(self) -> np.ndarray:
         """ Check if the agents are violating the boundaries
@@ -406,7 +350,6 @@ class OptimizationEnv(gym.Env):
         self.state[:, -1] = self.scaler_helper.scale(
             self.obj_values, self.worst_obj_value, self.best_obj_value)
         
-        #print(self.state, self.min_pos, self.max_pos, self.worst_obj_value, self.best_obj_value, self.current_step)
         # assert that the normalized state is within the bounds [0, 1]
         assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"
         

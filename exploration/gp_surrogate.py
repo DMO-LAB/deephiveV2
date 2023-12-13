@@ -70,7 +70,7 @@ class GPSurrogateModule:
         plt.plot(self.samples[-10:, 0], self.values[-10:], 'r.', markersize=10, label='Observations')
 
         # Plot variance
-        plt.fill_between(x, sigma, alpha=0.5, color='orange', label='Variance')
+        #plt.fill_between(x, sigma, alpha=0.5, color='orange', label='Variance')
         
         plt.xlabel("X")
         plt.ylabel("Y")
@@ -96,8 +96,8 @@ class GPSurrogateModule:
         plt.colorbar(contour, label='Prediction')
 
         # Plot variance
-        variance_contour = ax.contour(X, Y, sigma, colors='orange')
-        plt.colorbar(variance_contour, label='Variance')
+        # variance_contour = ax.contour(X, Y, sigma, colors='orange')
+        # plt.colorbar(variance_contour, label='Variance')
 
         ax.scatter(self.samples[-10:, 0], self.samples[-10:, 1], c='red', label='Observations')
         ax.set_title("Gaussian Process Surrogate Model (2D) with Variance")
@@ -109,5 +109,33 @@ class GPSurrogateModule:
     def __plot_higher_dims(self):
         raise NotImplementedError("Plotting higher dimensional data is not implemented yet.")
 
+    def evaluate_accuracy(self, real_func, bounds=None, num_points=100):
+        """
+        Evaluate the accuracy of the GP model against a real function in n-dimensions.
 
+        Parameters:
+        - real_func: The real function to compare against. This should be a function that
+                    accepts an n-dimensional array of points and returns their corresponding values.
+        - bounds: A list of tuples specifying the lower and upper bounds for each dimension.
+        - num_points: Number of points to evaluate along each dimension.
+        """
+        if bounds is None:
+            bounds = self.bounds
+        if len(bounds) != self.samples.shape[1]:
+            raise ValueError("The bounds dimensionality must match the sample dimensionality.")
 
+        # Generate a grid of test points
+        grid = np.meshgrid(*[np.linspace(b[0], b[1], num_points) for b in bounds])
+        test_points = np.vstack(map(np.ravel, grid)).T
+
+        # Evaluate the real function
+        y_real = real_func(test_points)
+
+        # Evaluate the GP model
+        y_pred, _ = self.gp.predict(test_points, return_std=True)
+
+        # Compute MSE or RMSE
+        mse = np.mean((y_real - y_pred) ** 2)
+        rmse = np.sqrt(mse)
+
+        return mse, rmse

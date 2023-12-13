@@ -96,9 +96,12 @@ class DefaultObservationScheme(ObservationScheme):
                 (self.env.state[agent][dim] - pbest[agent_nb][dim]),
                 (self.env.state[agent][self.env.n_dim] - pbest[agent_nb][self.env.n_dim]),
         ]
-        if use_gbest:
-            obs.extend([
-                self.env.state[agent][dim] - gbest[dim],
-                self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim],
-            ])
+        if use_gbest: 
+            # obs.extend([
+            #     self.env.state[agent][dim] - gbest[dim],
+            #     self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim],
+            # ])
+            # replace the third and fourth elements with the distance to gbest
+            obs[3] = self.env.state[agent][dim] - gbest[dim]
+            obs[4] = self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim]
         return obs

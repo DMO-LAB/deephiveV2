@@ -1,1 +1,2 @@
 from environment.observation_schemes.default_scheme import DefaultObservationScheme
+from environment.observation_schemes.explorers_scheme import ExplorersObservationScheme

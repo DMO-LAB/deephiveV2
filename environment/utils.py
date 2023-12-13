@@ -170,10 +170,7 @@ class Render:
             scat.set_offsets(self.env.state_history[:, i, :-2])
             text.set_text(f"Iteration: {i}")
             # use different colors for the particles based on their role - red for closer half, blue for farther half
-            if self.env.use_surrogate:
-                scat.set_label(["novel" if role == 1 else "non-novel" for role in self.env.state_history[:, i, -2]])
-            else:
-                scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -1]])
+            scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -2]])
     
             return scat,
         

@@ -45,7 +45,7 @@ class ExplorationModule:
         """
         return self.gmm.sample(n_samples)[0]
 
-    def assess_novelty(self, points):
+    def assess_novelty(self, points, scale=True):
         """
         Assess the novelty of given points based on the current GMM.
 
@@ -56,9 +56,50 @@ class ExplorationModule:
         densities = np.array([multivariate_normal(mean=mean, cov=cov, allow_singular=True).pdf(points)
                               for mean, cov in zip(self.gmm.means_, self.gmm.covariances_)])
 
+       # cap densities to prevent very small values - limits the novelty score
+        #densities[densities < 1e-6] = 1e-6
+        log_density = np.log10(densities)
+        # scale the logs to [0, 1] -  the smallest log will be 1 and the largest will be 0
+        scaled_log_density = (log_density - np.min(log_density)) / (np.max(log_density) - np.min(log_density))
         # Novelty score could be the inverse of density or a more complex function
         novelty_scores = 1 / np.max(densities, axis=0)
+        # Scale the novelty scores to [0, 1]
+        if scale:
+            novelty_scores = (novelty_scores - np.min(novelty_scores)) / (np.max(novelty_scores) - np.min(novelty_scores))
+
         return novelty_scores
+
+    def access_novelty_density(self, points):
+        """
+        Assess the novelty of given points based on the current GMM.
+
+        Parameters:
+        - points: An array of points to assess.
+        """
+        # Evaluate the probability density of each point under each GMM component
+        densities = np.array([multivariate_normal(mean=mean, cov=cov, allow_singular=True).pdf(points)
+                              for mean, cov in zip(self.gmm.means_, self.gmm.covariances_)])
+
+        # replace all 0 densities with 1/10th of the minimum density
+        densities[densities == 0] = np.min(densities[densities != 0]) / 10
+        # take the log of the densities
+        log_density = np.log10(densities)
+        # calculate the novelty score from the log of the densities
+        # small log values will have a high novelty score and large log values will have a low novelty score (- and +)
+        novelty_scores = np.max(log_density, axis=0) - log_density
+        # scale the novelty scores to [0, 1]
+        novelty_scores = (novelty_scores - np.min(novelty_scores)) / (np.max(novelty_scores) - np.min(novelty_scores))
+
+        # print densities, log_density, novelty_scores
+        print("Novelty scores: ", novelty_scores)
+        print("Densities: ", densities)
+        print("Log densities: ", log_density)
+        print("Max log density: ", np.max(log_density, axis=0))
+        print("Min log density: ", np.min(log_density, axis=0))
+        print("Max novelty score: ", np.max(novelty_scores))
+        print("Min novelty score: ", np.min(novelty_scores))
+
+        return novelty_scores, densities
 
     def get_variance(self, point):
         """
