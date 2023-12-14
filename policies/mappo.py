@@ -136,7 +136,7 @@ class ActorCritic(nn.Module):
             action_logprob: Log probability of the action sampled from the policy.
         """
         action_mean = self.actor(state)
-        print(f"action_mean: {action_mean}  - state: {state}")    
+        #print(f"action_mean: {action_mean}  - state: {state}")    
         if self.learn_std:
             action_var = self.get_std(std_obs) # type: ignore
             dist = tdist.Normal(action_mean, action_var)
