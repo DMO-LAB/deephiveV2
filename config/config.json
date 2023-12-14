@@ -20,7 +20,7 @@
     "use_variance":true,
     "variance_threshold": 0.0001,
     "randomize_worst_agent":true,
-    "gmm_n_components":2,
+    "gmm_n_components":4,
     "mode":"None",
 
 
@@ -36,7 +36,7 @@
     "layer_size":[16, 16],
     "std_min": 0.03,
     "std_max": 0.5,
-    "test_action_std": 0.02,
+    "test_action_std": 0.05,
     "std_type": "linear_decay",
     "learn_std": false,
     "pretrained": false,

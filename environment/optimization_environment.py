@@ -130,6 +130,7 @@ class OptimizationEnv(gym.Env):
         self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=self.gmm_n_components, bounds=self.bounds)
         self.prev_novelty_scores = self.gmm.assess_novelty(self.prev_agents_pos)
         if self.use_surrogate:
+            print("Using Surrogate Model")
             self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds)
             self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)   
         if self.mode == "exploration":
@@ -211,6 +212,9 @@ class OptimizationEnv(gym.Env):
                 self.gmm.plot_distribution()
             elif type == "surrogate":
                 self.surrogate.plot_surrogate(save_dir=file_path)
+
+            elif type == "surrogate_variance":
+                self.surrogate.plot_variance(save_dir=file_path)
             else:
                 raise ValueError("type should be either 'state' or 'history'")
         except Exception as e:

@@ -95,12 +95,69 @@ class GPSurrogateModule:
         contour = ax.contourf(X, Y, Z, cmap='viridis')
         plt.colorbar(contour, label='Prediction')
 
-        # Plot variance
-        # variance_contour = ax.contour(X, Y, sigma, colors='orange')
+        # # Plot variance
+        # variance_contour = ax.contourf(X, Y, sigma, colors='orange')
         # plt.colorbar(variance_contour, label='Variance')
 
-        ax.scatter(self.samples[-10:, 0], self.samples[-10:, 1], c='red', label='Observations')
-        ax.set_title("Gaussian Process Surrogate Model (2D) with Variance")
+        ax.scatter(self.samples[:, 0], self.samples[:, 1], c='red', label='Observations')
+        ax.set_title("Gaussian Process Surrogate Model (2D) Mean Prediction")
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        plt.legend()
+        plt.savefig(save_dir)
+
+
+    def plot_variance(self, save_dir="gp_surrogate_variance.png"):
+        """
+        Plot the variance of the learned surrogate function according to the dimensionality of the data.
+        """
+        dim = self.samples.shape[1]
+
+        if dim == 1:
+            # Plot for 1D data
+            self.__plot_1d_variance(save_dir)
+        elif dim == 2:
+            # Plot for 2D data
+            self.__plot_2d_variance(save_dir)
+        else:
+            # For higher dimensions, visualize a 2D slice or projection
+            print("Data is higher than 2D. Plotting a 2D slice.")
+            self.__plot_higher_dims()
+
+    def __plot_1d_variance(self, save_dir="gp_surrogate_variance_1d.png"):
+        x = np.linspace(self.bounds[0], self.bounds[1], 1000)
+        X = np.atleast_2d(x).T
+        y_pred, sigma = self.gp.predict(X, return_std=True)
+
+        plt.figure()
+        plt.plot(x, sigma, 'b-', label='GP Variance')
+        plt.plot(self.samples[-10:, 0], self.values[-10:], 'r.', markersize=10, label='Observations')
+
+        plt.xlabel("X")
+        plt.ylabel("Variance")
+        plt.title("Gaussian Process Surrogate Model Variance (1D)")
+        plt.legend()
+        plt.savefig(save_dir)
+
+    def __plot_2d_variance(self, save_dir="gp_surrogate_variance_2d.png"):
+        # Create a grid for plotting
+        x = np.linspace(self.bounds[0], self.bounds[1], 100)
+        y = np.linspace(self.bounds[0], self.bounds[1], 100)
+        X, Y = np.meshgrid(x, y)
+        XY = np.vstack([X.ravel(), Y.ravel()]).T
+
+        # Predictions and variance
+        Z, sigma = self.gp.predict(XY, return_std=True)
+        Z = Z.reshape(X.shape)
+        sigma = sigma.reshape(X.shape)
+
+        # Plot variance
+        fig, ax = plt.subplots()
+        contour = ax.contourf(X, Y, sigma, cmap='viridis')
+        plt.colorbar(contour, label='Variance')
+
+        ax.scatter(self.samples[-20:, 0], self.samples[-20:, 1], c='red', label='Observations')
+        ax.set_title("Gaussian Process Surrogate Model Variance (2D)")
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         plt.legend()

@@ -177,7 +177,30 @@ class ExplorationModule:
         XY = np.array([X.ravel(), Y.ravel()]).T
 
         # Evaluate the GMM's probability density function (PDF) on the grid
-        Z = np.exp(self.gmm.score_samples(XY))
+        Z = self.gmm.score_samples(XY)
+    
+        Z = Z.reshape(X.shape)
+        # Plot the contour
+        plt.contourf(X, Y, Z, levels=50, cmap='viridis')
+        plt.colorbar()
+        plt.title('GMM Contour Plot')
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.show()
+
+    def plot_distribution_no_exp(self):
+        """
+        Plot the current GMM.
+        """
+        # Create a mesh grid on which to evaluate the GMM
+        x = np.linspace(self.lower_bound, self.upper_bound, 100)
+        y = np.linspace(self.lower_bound, self.upper_bound, 100)
+        X, Y = np.meshgrid(x, y)
+        XY = np.array([X.ravel(), Y.ravel()]).T
+
+        # Evaluate the GMM's probability density function (PDF) on the grid
+        Z = self.gmm.score_samples(XY)
+    
         Z = Z.reshape(X.shape)
         # Plot the contour
         plt.contourf(X, Y, Z, levels=50, cmap='viridis')

@@ -114,8 +114,8 @@ class Render:
         # use triangles to for the shape of the particles
         # plot scatter plot of the novel points with color red and the rest with color blue
         novel_id = self.env.ids_true_function_eval
-        ax.scatter(state[novel_id, 0], state[novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="novel points")
-        ax.scatter(state[~novel_id, 0], state[~novel_id, 1], c="blue", s=100, marker="^", edgecolors="black", label="non-novel points")
+        ax.scatter(state[novel_id, 0], state[novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="novel points", alpha=1)
+        ax.scatter(state[~novel_id, 0], state[~novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="non-novel points", alpha=1)
         
         plt.savefig("test.png")
         plt.show()
