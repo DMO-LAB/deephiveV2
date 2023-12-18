@@ -18,7 +18,32 @@ class GPSurrogateModule:
         self.kernel = kernel if kernel is not None else C(1.0, (1e-3, 1e3)) * RBF(1.0, (1e-2, 1e2))
         self.gp = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=9)
         self.gp.fit(self.samples, self.values)
-        self.bounds = kwargs.get("bounds", [-1, 1])  # Define bounds for plotting
+        self.bounds = kwargs.get("bounds", np.array([[-1, -1], [1, 1]]))
+        
+        self.checkpoints = self._initialize_checkpoints()
+        
+    def _initialize_checkpoints(self, resolution=0.05):
+        # Define the bounds of the grid
+        x_min, y_min = self.bounds[0]
+        x_max, y_max = self.bounds[1]
+    
+
+        # Create a meshgrid of x and y values within the bounds
+        x_values = np.arange(x_min, x_max + resolution, resolution)
+        y_values = np.arange(y_min, y_max + resolution, resolution)
+        xx, yy = np.meshgrid(x_values, y_values)
+
+        # Flatten the meshgrid to get the individual x and y coordinates
+        x_coordinates = xx.flatten()
+        y_coordinates = yy.flatten()
+
+        # Create a list of points as (x, y) tuples
+        points = list(zip(x_coordinates, y_coordinates))
+
+        # Convert the list of points to a NumPy array
+        points_array = np.array(points)
+        
+        return points_array
 
     def update_model(self, new_samples, new_values):
         """
@@ -32,7 +57,7 @@ class GPSurrogateModule:
         self.values = np.append(self.values, new_values)
         self.gp.fit(self.samples, self.values)
 
-    def evaluate(self, points):
+    def evaluate(self, points, scale=False):
         """
         Evaluate new points using the GP model.
 
@@ -40,6 +65,11 @@ class GPSurrogateModule:
         - points: An array of points to evaluate.
         """
         predictions, std_dev = self.gp.predict(points, return_std=True)
+        if scale:
+            # ensure the points are more than 1 and then scale the std_dev from 0 to 1
+            if len(std_dev) == 1:
+                raise ValueError("The points must be more than 1")
+            std_dev = (std_dev - np.min(std_dev)) / (np.max(std_dev) - np.min(std_dev))
         return predictions, std_dev
 
     def plot_surrogate(self, save_dir = "gp_surrogate.png"):
@@ -60,7 +90,7 @@ class GPSurrogateModule:
             self.__plot_higher_dims()
 
     def __plot_1d(self, save_dir="gp_surrogate_1d.png"):
-        x = np.linspace(self.bounds[0], self.bounds[1], 1000)
+        x = np.linspace(self.bounds[0][0], self.bounds[1][0], 1000)
         X = np.atleast_2d(x).T
         y_pred, sigma = self.gp.predict(X, return_std=True)
 
@@ -69,9 +99,6 @@ class GPSurrogateModule:
         plt.fill_between(x, y_pred - sigma, y_pred + sigma, alpha=0.2, color='blue')
         plt.plot(self.samples[-10:, 0], self.values[-10:], 'r.', markersize=10, label='Observations')
 
-        # Plot variance
-        #plt.fill_between(x, sigma, alpha=0.5, color='orange', label='Variance')
-        
         plt.xlabel("X")
         plt.ylabel("Y")
         plt.title("Gaussian Process Surrogate Model (1D) with Variance")
@@ -80,8 +107,8 @@ class GPSurrogateModule:
 
     def __plot_2d(self, save_dir="gp_surrogate_2d.png"):
         # Create a grid for plotting
-        x = np.linspace(self.bounds[0], self.bounds[1], 100)
-        y = np.linspace(self.bounds[0], self.bounds[1], 100)
+        x = np.linspace(self.bounds[0][0], self.bounds[1][0], 100)
+        y = np.linspace(self.bounds[0][1], self.bounds[1][1], 100)
         X, Y = np.meshgrid(x, y)
         XY = np.vstack([X.ravel(), Y.ravel()]).T
 
@@ -94,10 +121,6 @@ class GPSurrogateModule:
         fig, ax = plt.subplots()
         contour = ax.contourf(X, Y, Z, cmap='viridis')
         plt.colorbar(contour, label='Prediction')
-
-        # # Plot variance
-        # variance_contour = ax.contourf(X, Y, sigma, colors='orange')
-        # plt.colorbar(variance_contour, label='Variance')
 
         ax.scatter(self.samples[:, 0], self.samples[:, 1], c='red', label='Observations')
         ax.set_title("Gaussian Process Surrogate Model (2D) Mean Prediction")
@@ -141,8 +164,8 @@ class GPSurrogateModule:
 
     def __plot_2d_variance(self, save_dir="gp_surrogate_variance_2d.png"):
         # Create a grid for plotting
-        x = np.linspace(self.bounds[0], self.bounds[1], 100)
-        y = np.linspace(self.bounds[0], self.bounds[1], 100)
+        x = np.linspace(self.bounds[0][0], self.bounds[1][0], 100)
+        y = np.linspace(self.bounds[0][1], self.bounds[1][1], 100)
         X, Y = np.meshgrid(x, y)
         XY = np.vstack([X.ravel(), Y.ravel()]).T
 
@@ -196,3 +219,51 @@ class GPSurrogateModule:
         rmse = np.sqrt(mse)
 
         return mse, rmse
+        
+    def check_checkpoints(self, alpha=1, percentile=85):
+        self.checkpoints_mean, self.checkpoints_std = self.evaluate(self.checkpoints, scale=True)
+        mean_std = np.array(self.checkpoints_mean) + np.array(self.checkpoints_std) * alpha
+        
+        high_std = np.percentile(self.checkpoints_std, percentile)
+        high_mean_std = np.percentile(mean_std, percentile)
+        low_std = np.percentile(self.checkpoints_std, 100 - percentile)
+        
+        high_std_points = self.checkpoints[np.where(self.checkpoints_std >= high_std)]
+        high_std_points_std = self.checkpoints_std[np.where(self.checkpoints_std >= high_std)]
+        low_std_points = self.checkpoints[np.where(self.checkpoints_std <= low_std)]
+        self.percent_high_std = high_std_points.shape[0] / self.checkpoints.shape[0] * 100
+        
+        high_mean_std_points = self.checkpoints[np.where(mean_std >= high_mean_std)]
+
+        
+        self.high_std_points = high_std_points
+        self.high_mean_std_points = high_mean_std_points
+        self.low_std_points = low_std_points
+        
+        return high_std_points, high_std_points_std
+
+
+    def cal_reward(self):
+        _ = self.check_checkpoints()
+        reward = 1 - self.percent_high_std / 100
+        std_std = np.std(self.checkpoints_std)
+        
+        return reward * (1 - std_std)
+        
+        # calculate the 
+        
+    def plot_checkpoints_state(self):
+        
+        if not hasattr(self, "high_std_points"):
+            self.check_checkpoints()
+        
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
+        ax.scatter(self.checkpoints[:, 0], self.checkpoints[:, 1], s=10, color='black', label="Checkpoints")
+        ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], s=20, color='red', label="High Std")
+        # overlay the sampled points on the plot
+        ax.scatter(self.samples[:, 0], self.samples[:, 1], s=20, color='yellow', label="Sampled Points")
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        ax.set_title('Grid of Points')
+        ax.grid(True)
+        plt.show()

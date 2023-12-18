@@ -7,17 +7,20 @@ class ExplorersObservationScheme(ObservationScheme):
     
     def generate_observation(self):
         self.agent_pos = self.env._get_actual_state()[:, :-1]
-        self.novelty_scores = self.env.gmm.assess_novelty(self.agent_pos)
+        self.unexplored_area, self.unexplored_area_std = self.env._get_unexplored_area()
+        
         agent_obs = [[] for _ in range(self.env.n_dim)]
         std_obs = [[] for _ in range(self.env.n_dim)]
         nbs = self._get_agent_neighbors()
         
         for agent in range(self.env.n_agents):
             agent_nb = nbs[agent]
-
-
+            
+            random_point = np.random.randint(0, len(self.unexplored_area))
+            unexplored_point = self.unexplored_area[random_point]
+            unexplored_point_std = self.unexplored_area_std[random_point]
             for dim in range(self.env.n_dim):
-                obs_values = self._get_obs_for_dim(agent, agent_nb, dim)
+                obs_values = self._get_obs_for_dim(agent, agent_nb, dim, unexplored_point, unexplored_point_std)
                 agent_obs[dim].append(np.array([obs_values]))
 
         obs_length = agent_obs[0][0].shape[1]
@@ -42,17 +45,17 @@ class ExplorersObservationScheme(ObservationScheme):
         
         Args:
 
-        Returns:
+        Returns:  
         List[np.ndarray]: List of binary arrays representing the roles of agents in each dimension.
         """
         roles_per_dimension = []
 
-        for agent in range(self.env.n_agents):
+        for agent in range(self.env.n_dim):
             # Calculate the number of agents
             n_agents = self.env.n_agents
             
             # Sort agents by their distance and get their indices
-            sorted_indices = np.argsort(self.novelty_scores)
+            sorted_indices = np.argsort(self.env.agents_pos_std)
             
             # Assign roles: 1 for closer half, 0 for farther half
             roles = np.zeros(n_agents)
@@ -64,12 +67,18 @@ class ExplorersObservationScheme(ObservationScheme):
 
         return roles_per_dimension
 
-    def _get_obs_for_dim(self, agent, agent_nb, dim):
-        obs = [ #self.env.state[agent][dim],
+    def _get_obs_for_dim(self, agent, agent_nb, dim, unexplored_point, unexplored_point_std):
+        obs = [ self.agent_pos[agent][dim] - unexplored_point[dim], # unexplored area
+                self.env.agents_pos_std[agent] - unexplored_point_std, # unexplored area std
                 self.agent_pos[agent][dim] - self.env.prev_agents_pos[agent][dim], # agent position
-                self.novelty_scores[agent], # agent novelty score
-                self.agent_pos[agent][dim] - self.agent_pos[agent_nb][dim], # neighbor position
-                self.novelty_scores[agent_nb], # neighbor novelty score
-                self.env.prev_novelty_scores[agent], # previous agent novelty score
+                self.env.agents_pos_std[agent] - self.env.prev_agents_pos_std[agent], # agent position std
+                self.agent_pos[agent][dim] - self.agent_pos[agent_nb][dim], 
+                self.env.agents_pos_std[agent] - self.env.agents_pos_std[agent_nb],
         ]
+        
+        # check that there are no invalid values in obs (nan or inf)
+        for i in range(len(obs)):
+            if np.isnan(obs[i]) or np.isinf(obs[i]):
+                print(f"Invalid value in obs: {obs[i]}")
+                obs[i] = 0
         return obs

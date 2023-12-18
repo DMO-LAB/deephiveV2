@@ -74,7 +74,6 @@ class OptimizationEnv(gym.Env):
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
             self.mode = self.config["mode"] if "mode" in self.config else "exploration"
-            self.gmm_n_components = self.config["gmm_n_components"] if "gmm_n_components" in self.config else 3
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -127,12 +126,10 @@ class OptimizationEnv(gym.Env):
         self._update_pbest()
         actual_samples = self._get_actual_state()
         self.ids_true_function_eval = np.arange(self.n_agents)
-        self.gmm = ExplorationModule(initial_samples=actual_samples[:, :-1], n_components=self.gmm_n_components, bounds=self.bounds)
-        self.prev_novelty_scores = self.gmm.assess_novelty(self.prev_agents_pos)
         if self.use_surrogate:
-            print("Using Surrogate Model")
-            self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds)
-            self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)   
+            self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds) 
+            _, self.agents_pos_std = self.surrogate.evaluate(actual_samples[:, :-1], scale=True)
+            self.prev_agents_pos_std = self.agents_pos_std.copy()
         if self.mode == "exploration":
             observation = self.observation_schemes.generate_observation()
         else:
@@ -149,10 +146,9 @@ class OptimizationEnv(gym.Env):
         assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         self.prev_state = self.state.copy()
         self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
+        _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
         self.prev_obj_values = self.obj_values.copy()
-        self.prev_novelty_scores = self.gmm.assess_novelty(self.prev_agents_pos)
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
-        novelty_scores = self.gmm.access_novelty_density(self._get_actual_state()[:, :-1])
         # Apply the action to the state
         self.state[:, :-1] += action
 
@@ -165,9 +161,9 @@ class OptimizationEnv(gym.Env):
         self.boundary_violating_agents = np.where(self.boundary_violating_agents)[0]
         self.state = np.clip(self.state, np.zeros_like(self.state), np.ones_like(self.state))
         self.state = self._get_actual_state()
-        self.gmm.update_distribution(self.state[:, :-1])
         if self.use_surrogate:
             self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
+            _ , self.agents_pos_std = self.surrogate.evaluate(self.state[:, :-1], scale=True)
 
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
         self.num_of_function_evals += self.n_agents
@@ -178,7 +174,7 @@ class OptimizationEnv(gym.Env):
         self._update_done_flag()
 
         agents_done = np.array([self.done for _ in range(self.n_agents)])
-        self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
+        # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
         if self.mode == "exploration":
             observation = self.observation_schemes.generate_observation()
@@ -208,8 +204,6 @@ class OptimizationEnv(gym.Env):
                 self.render_helper.render_state()
             elif type == "history":
                 self.render_helper.render_state_history(file_path=file_path, fps=fps)
-            elif type == "gmm":
-                self.gmm.plot_distribution()
             elif type == "surrogate":
                 self.surrogate.plot_surrogate(save_dir=file_path)
 
@@ -229,6 +223,17 @@ class OptimizationEnv(gym.Env):
         boundary_violating_agents = np.any(
             (self.state[:] <= np.zeros_like(self.state)) | (self.state[:] >= np.ones_like(self.state)), axis=1)
         return boundary_violating_agents
+    
+    def _get_unexplored_area(self) -> np.ndarray:
+        """ Get the unexplored area of the agents from the surrounding model
+        Returns:
+            unexplored_area: unexplored area of the agents
+        """
+        high_std_points, high_std_points_std = self.surrogate.check_checkpoints(alpha=1, percentile=90)
+        # normalize the points to the bounds
+        high_std_points = self.scaler_helper.scale(high_std_points, self.min_pos, self.max_pos)
+        return high_std_points, high_std_points_std
+        
         
     def _get_info(self) -> Dict[str, Any]:
         """

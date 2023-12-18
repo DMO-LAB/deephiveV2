@@ -50,6 +50,7 @@ class OptimizationTrainer:
         for dim in range(self.env.n_dim):
             observation[dim] = observation[dim].astype(np.float32)
             observation_std[dim] = observation_std[dim].astype(np.float32)
+            #print(observation[dim], observation_std[dim])
             action = self.agent_policy.select_action(observation[dim], observation_std[dim])
             actions[:, dim] = action
         return actions
@@ -81,6 +82,7 @@ class OptimizationTrainer:
         os.makedirs(save_path, exist_ok=True)
         timesteps = 0
         for episode in range(0, n_episodes+1):
+            print(f"Episode: {episode}")
             observation_info = self.env.reset()
             episode_return = np.zeros(self.env.n_agents)
             for step in range(self.env.ep_length):
