@@ -2,7 +2,7 @@ import numpy as np
 from environment.reward_schemes import RewardScheme
 
 class ExplorersRewardScheme(RewardScheme):
-    def __init__(self, env, stuck_reward=-1, optimal_reward=10, frozen_best_reward=0):
+    def __init__(self, env, stuck_reward=-2, optimal_reward=10, frozen_best_reward=0):
         super().__init__(env)
         self.stuck_reward = stuck_reward
         self.optimal_reward = optimal_reward
@@ -25,7 +25,7 @@ class ExplorersRewardScheme(RewardScheme):
         surrogate_reward = self.env.surrogate.cal_reward()
         # propagate the surrogate reward to the environment
         reward = [surrogate_reward for _ in range(self.env.n_agents)]
-        #reward = self._post_process_rewards(np.array(reward))
+        reward = self._post_process_rewards(np.array(reward))
         # reward += -np.log(1 - self.env.state[:, -1] + 0.001)
         return reward
     
@@ -42,6 +42,11 @@ class ExplorersRewardScheme(RewardScheme):
                 reward[agent] = self.stuck_reward
             else:
                 pass
+
+        if self.env.current_step >= self.env.ep_length:
+            # get percentage of agent swith high std from surrogate
+            reward -= (self.env.surrogate.percent_high_std / 100) * 2
+         
         return reward
 
 

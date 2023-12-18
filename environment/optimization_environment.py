@@ -410,6 +410,8 @@ class OptimizationEnv(gym.Env):
                 if np.all(past_obj_values == past_obj_values[0]) and agent != self.best_agent:
                     stuck_agents.append(agent)
         
+        if len(stuck_agents) > 1:
+            print(f"{len(stuck_agents)} agents are stuck - {stuck_agents} at step {self.current_step}")
         return stuck_agents
 
 

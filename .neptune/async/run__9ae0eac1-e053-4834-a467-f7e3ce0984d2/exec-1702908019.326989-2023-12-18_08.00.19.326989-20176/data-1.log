@@ -1,0 +1,13 @@
+{"obj": {"type": "AssignString", "path": ["sys", "name"], "value": "Untitled"}, "version": 1}
+{"obj": {"type": "AssignString", "path": ["sys", "description"], "value": ""}, "version": 2}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e2cdc2ef", "hostname"], "value": "me-owoyele-wk"}, "version": 3}
+{"obj": {"type": "AssignString", "path": ["sys", "hostname"], "value": "me-owoyele-wk"}, "version": 4}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e2cdc2ef", "pid"], "value": "20176"}, "version": 5}
+{"obj": {"type": "AssignString", "path": ["monitoring", "e2cdc2ef", "tid"], "value": "20084"}, "version": 6}
+{"obj": {"type": "AddStrings", "path": ["sys", "tags"], "values": ["[16, 16]", "default run", "train", "GaussianPeakFunction"]}, "version": 7}
+{"obj": {"type": "AssignBool", "path": ["sys", "failed"], "value": false}, "version": 8}
+{"obj": {"type": "ClearStringLog", "path": ["monitoring", "e2cdc2ef", "stdout"]}, "version": 9}
+{"obj": {"type": "ClearStringLog", "path": ["monitoring", "e2cdc2ef", "stderr"]}, "version": 10}
+{"obj": {"type": "AssignString", "path": ["source_code", "entrypoint"], "value": "deephive2.py"}, "version": 11}
+{"obj": {"type": "UploadFileSet", "path": ["source_code", "files"], "file_globs": ["D:\\FALL23-RESEARCH\\Optimization\\deephiveV2\\environment", "D:\\FALL23-RESEARCH\\Optimization\\deephiveV2\\policies", "D:\\FALL23-RESEARCH\\Optimization\\deephiveV2\\deephive.py", "D:\\FALL23-RESEARCH\\Optimization\\deephiveV2\\config"], "reset": "False"}, "version": 12}
+{"obj": {"type": "UploadFile", "path": ["source_code", "diff"], "ext": "patch", "file_path": null, "tmp_file_name": "source_code_diff-1702908019.553601-2023-12-18_08.00.19.553601.patch", "clean_after_upload": false}, "version": 13}

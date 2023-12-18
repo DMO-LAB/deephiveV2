@@ -14,7 +14,7 @@
     "use_gbest": true,
     "use_optimal_value": false,
     "update_timestep": 25,
-    "log_interval": 200,
+    "log_interval": 100,
     "enforce_good_actions": false,
     "use_surrogate": true,
     "use_variance":true,

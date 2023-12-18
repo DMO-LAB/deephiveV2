@@ -56,6 +56,7 @@ class GPSurrogateModule:
         self.samples = np.vstack([self.samples, new_samples])
         self.values = np.append(self.values, new_values)
         self.gp.fit(self.samples, self.values)
+        #print(f"Updated GP model with {self.samples.shape[0]} new samples.")
 
     def evaluate(self, points, scale=False):
         """
@@ -69,7 +70,7 @@ class GPSurrogateModule:
             # ensure the points are more than 1 and then scale the std_dev from 0 to 1
             if len(std_dev) == 1:
                 raise ValueError("The points must be more than 1")
-            std_dev = (std_dev - np.min(std_dev)) / (np.max(std_dev) - np.min(std_dev))
+            std_dev = (std_dev - np.min(std_dev)) / max((np.max(std_dev) - np.min(std_dev)), 1e-6)
         return predictions, std_dev
 
     def plot_surrogate(self, save_dir = "gp_surrogate.png"):
@@ -252,7 +253,7 @@ class GPSurrogateModule:
         
         # calculate the 
         
-    def plot_checkpoints_state(self):
+    def plot_checkpoints_state(self, save_dir=None):
         
         if not hasattr(self, "high_std_points"):
             self.check_checkpoints()
@@ -266,4 +267,7 @@ class GPSurrogateModule:
         ax.set_ylabel('Y-axis')
         ax.set_title('Grid of Points')
         ax.grid(True)
-        plt.show()
+        if save_dir is not None:
+            plt.savefig(save_dir)
+        else:
+            plt.show()

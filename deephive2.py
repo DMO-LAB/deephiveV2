@@ -103,6 +103,7 @@ class OptimizationTrainer:
                     running_average_rewards = np.mean(average_returns)
                     if self.neptune_logger:
                         self.neptune_logger["train/average_return"].log(average_returns[-1])
+                        self.neptune_logger["train/percentage_high_std"].log(self.env.surrogate.percent_high_std)
                 timesteps += 1
             if timesteps % update_timestep == 0:
                 self.agent_policy.update()
@@ -113,6 +114,15 @@ class OptimizationTrainer:
                         average_returns = average_returns[-1],
                         timesteps = timesteps,
                     )
+                self.env.surrogate.plot_checkpoints_state(f"{save_path}surrogate-checkpoint-{episode}.png")
+                self.env.surrogate.plot_variance(f"{save_path}variance-{episode}.png")
+                self.env.surrogate.plot_surrogate(f"{save_path}surrogate-{episode}.png")
+                if self.neptune_logger:
+                    self.neptune_logger[f"train/plots/surrogate/surrogate-{episode}"].upload(f"{save_path}surrogate-{episode}.png")
+                    self.neptune_logger[f"train/plots/variance/variance-{episode}"].upload(f"{save_path}variance-{episode}.png")
+                    self.neptune_logger[f"train/plots/surrogate_checker/surrogate-checkpoint-{episode}"].upload(f"{save_path}surrogate-checkpoint-{episode}.png")
+                    
+
                 if self.env.n_dim <= 2:
                     self.env.render(file_path=f"{save_path}{episode}.gif", type="history")
                     if self.neptune_logger:
