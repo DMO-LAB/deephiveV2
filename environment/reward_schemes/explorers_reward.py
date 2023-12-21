@@ -45,7 +45,7 @@ class ExplorersRewardScheme(RewardScheme):
 
         if self.env.current_step >= self.env.ep_length:
             # get percentage of agent swith high std from surrogate
-            reward -= (self.env.surrogate.percent_high_std / 100) * 2
+            reward -= (self.env.surrogate.percent_high_std / 100) * 5
          
         return reward
 

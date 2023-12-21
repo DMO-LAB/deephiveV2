@@ -137,6 +137,9 @@ class OptimizationTrainer:
                     self.agent_policy.save(save_path, episode=timesteps)
                     if self.neptune_logger:
                         self.neptune_logger[f"train/checkpoints/timesteps-{timesteps}"].upload(f"{save_path}/policy-{timesteps}.pth")
+                        
+        # delete the save path folder 
+        os.rmdir(save_path)
 
     def test_policy(self, n_iterations, log_interval=5, save_dir=None):
         global_best_values = []
