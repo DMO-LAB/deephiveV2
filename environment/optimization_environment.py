@@ -147,10 +147,12 @@ class OptimizationEnv(gym.Env):
         self.prev_state = self.state.copy()
         self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
         _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
+        #print(self.prev_agents_pos_std)
         self.prev_obj_values = self.obj_values.copy()
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
         # Apply the action to the state
         self.state[:, :-1] += action
+        print(f"action: {action}")
 
         # Handle freezing of the best agent 
         if self.freeze: 
@@ -162,12 +164,13 @@ class OptimizationEnv(gym.Env):
         self.state = np.clip(self.state, np.zeros_like(self.state), np.ones_like(self.state))
         self.state = self._get_actual_state()
         if self.use_surrogate:
-            self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
             _ , self.agents_pos_std = self.surrogate.evaluate(self.state[:, :-1], scale=True)
+            self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
 
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
         self.num_of_function_evals += self.n_agents
-
+        
+        print(f"current step: {self.current_step}")
         self.current_step += 1
         self._update_env_state()
         self._update_pbest()

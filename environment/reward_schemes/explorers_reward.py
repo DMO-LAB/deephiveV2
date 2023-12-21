@@ -7,6 +7,7 @@ class ExplorersRewardScheme(RewardScheme):
         self.stuck_reward = stuck_reward
         self.optimal_reward = optimal_reward
         self.frozen_best_reward = frozen_best_reward
+        self.new_area_explored_reward = 3
 
     def compute_reward(self):
         """
@@ -39,14 +40,18 @@ class ExplorersRewardScheme(RewardScheme):
         stuck_agents = self.env._get_stuck_agents(threshold=2)
         for agent in stuck_agents:
             if self.env.prev_state[agent, -1] == self.env.state[agent, -1]:
-                reward[agent] = self.stuck_reward
-            else:
-                pass
+                reward[agent] += self.stuck_reward
+                
+            # check if new area is explored
+            if self._check_new_area_explored(agent):
+                print(f"Agent {agent} explored new area - previous std: {self.env.prev_agents_pos_std[agent]}, current std: {self.env.agents_pos_std[agent]}")
+                reward[agent] += self.new_area_explored_reward
+            
 
-        if self.env.current_step >= self.env.ep_length:
+        if self.env.current_step >= self.env.ep_length - 5:
             # get percentage of agent swith high std from surrogate
-            reward -= (self.env.surrogate.percent_high_std / 100) * 5
-         
+            reward -= (self.env.surrogate.percent_high_std / 100) * 4
+            
         return reward
 
 
@@ -61,16 +66,18 @@ class ExplorersRewardScheme(RewardScheme):
             return (current_gbest > previous_gbest).astype(int)
 
     
-    def _check_new_area_explored(self, threshold=0.1):
-        # check if the distance between the current state and the previous state is greater than a threshold
-        previous_state = self.env.state_history[:, -2, :-1]
-        current_state = self.env.state_history[:, -1, :-1]
+    def _check_new_area_explored(self, agent):
+        # check the difference between the previous agent std and the current agent std
+        previous_agent_std = self.env.prev_agents_pos_std[agent]
+        current_agent_std = self.env.agents_pos_std[agent]
         
-        # measure the euclidean distance between the two states for each agent
-        distances = np.linalg.norm(previous_state - current_state, axis=1)
+        # the current agent should have a higher std than the previous agent
+        if current_agent_std > previous_agent_std:
+            return True
+        else:
+            return False
         
-        # return a boolean array indicating whether the distance is greater than the threshold
-        return distances > threshold
+        
     
     def _check_agent_stagnation(self, threshold=2):
         # check if the agents are stuck
@@ -78,6 +85,7 @@ class ExplorersRewardScheme(RewardScheme):
         
         # return a boolean array indicating whether the agent is in the stuck_agents list or not
         return np.isin(np.arange(self.env.n_agents), stuck_agents)
+    
     
         
         

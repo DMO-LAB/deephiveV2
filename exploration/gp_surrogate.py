@@ -260,9 +260,9 @@ class GPSurrogateModule:
         
         fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
         ax.scatter(self.checkpoints[:, 0], self.checkpoints[:, 1], s=10, color='black', label="Checkpoints")
-        ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], s=20, color='red', label="High Std")
+        ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], s=30, color='red', label="High Std")
         # overlay the sampled points on the plot
-        ax.scatter(self.samples[:, 0], self.samples[:, 1], s=20, color='yellow', label="Sampled Points")
+        ax.scatter(self.samples[:, 0], self.samples[:, 1], s=50, color='green', label="Sampled Points")
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         ax.set_title('Grid of Points')
