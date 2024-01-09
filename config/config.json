@@ -6,7 +6,7 @@
     "init_state": null,
     "opt_bound": 0.9,
     "reward_type": "full",
-    "freeze": false,
+    "freeze": true,
     "observation_scheme": "DefaultObservationScheme",
     "reward_scheme": "FullRewardScheme",
     "objective_function":  "GaussianPeakFunction",

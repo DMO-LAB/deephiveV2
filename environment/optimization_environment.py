@@ -170,7 +170,7 @@ class OptimizationEnv(gym.Env):
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
         self.num_of_function_evals += self.n_agents
         
-        print(f"current step: {self.current_step}")
+        # print(f"current step: {self.current_step}")
         self.current_step += 1
         self._update_env_state()
         self._update_pbest()

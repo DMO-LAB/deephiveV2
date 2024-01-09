@@ -11,3 +11,5 @@ training_runs
 .env
 Haresh_Experiment
 .neptune
+*.npy
+.png
