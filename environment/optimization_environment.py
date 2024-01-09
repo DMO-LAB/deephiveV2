@@ -152,7 +152,7 @@ class OptimizationEnv(gym.Env):
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
         # Apply the action to the state
         self.state[:, :-1] += action
-        print(f"action: {action}")
+        #print(f"action: {action}")
 
         # Handle freezing of the best agent 
         if self.freeze: 

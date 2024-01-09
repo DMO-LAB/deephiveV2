@@ -108,7 +108,7 @@ class OptimizationTrainer:
             if timesteps % update_timestep == 0:
                 self.agent_policy.update()
         
-            if episode % log_interval == 0 and timesteps > 0:
+            if timesteps > 0:
                 self.print_items(
                         episode = episode,
                         average_returns = average_returns[-1],
@@ -139,7 +139,7 @@ class OptimizationTrainer:
                         self.neptune_logger[f"train/checkpoints/timesteps-{timesteps}"].upload(f"{save_path}/policy-{timesteps}.pth")
                         
         # delete the save path folder 
-        os.rmdir(save_path)
+        # os.rmdir(save_path)
 
     def test_policy(self, n_iterations, log_interval=5, save_dir=None):
         global_best_values = []

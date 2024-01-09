@@ -2,12 +2,12 @@ import numpy as np
 from environment.reward_schemes import RewardScheme
 
 class ExplorersRewardScheme(RewardScheme):
-    def __init__(self, env, stuck_reward=-2, optimal_reward=10, frozen_best_reward=0):
+    def __init__(self, env, stuck_reward=-5, optimal_reward=10, frozen_best_reward=0):
         super().__init__(env)
         self.stuck_reward = stuck_reward
         self.optimal_reward = optimal_reward
         self.frozen_best_reward = frozen_best_reward
-        self.new_area_explored_reward = 3
+        self.new_area_explored_reward = 5
 
     def compute_reward(self):
         """
@@ -51,6 +51,9 @@ class ExplorersRewardScheme(RewardScheme):
         if self.env.current_step >= self.env.ep_length - 5:
             # get percentage of agent swith high std from surrogate
             reward -= (self.env.surrogate.percent_high_std / 100) * 4
+            if self.env.surrogate.percent_high_std <= 20:
+                reward += (10 - self.env.surrogate.percent_high_std / 10)
+                print(f"Surrogate has less than 20% of agents with high std - {self.env.surrogate.percent_high_std}%  - adding reward {10 - self.env.surrogate.percent_high_std / 10}")
             
         return reward
 

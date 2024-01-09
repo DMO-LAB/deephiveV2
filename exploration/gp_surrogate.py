@@ -15,7 +15,7 @@ class GPSurrogateModule:
         """
         self.samples = initial_samples
         self.values = initial_values
-        self.kernel = kernel if kernel is not None else C(1.0, (1e-3, 1e3)) * RBF(1.0, (1e-2, 1e2))
+        self.kernel = kernel if kernel is not None else C(1.0, (1e-5, 1e5)) * RBF(1.0, (1e-3, 1e3))
         self.gp = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=9)
         self.gp.fit(self.samples, self.values)
         self.bounds = kwargs.get("bounds", np.array([[-1, -1], [1, 1]]))
