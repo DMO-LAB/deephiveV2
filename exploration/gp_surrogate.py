@@ -54,6 +54,7 @@ class GPSurrogateModule:
         - new_values: Values at the new sample points.
         """
         self.samples = np.vstack([self.samples, new_samples])
+        print(self.samples.shape)
         self.values = np.append(self.values, new_values)
         self.gp.fit(self.samples, self.values)
         #print(f"Updated GP model with {self.samples.shape[0]} new samples.")

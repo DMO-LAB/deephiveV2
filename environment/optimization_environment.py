@@ -165,7 +165,17 @@ class OptimizationEnv(gym.Env):
         self.state = self._get_actual_state()
         if self.use_surrogate:
             _ , self.agents_pos_std = self.surrogate.evaluate(self.state[:, :-1], scale=True)
-            self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
+            # if agents are too close to each other, select only one for training the surrogate
+            surrogate_state = self.state.copy()
+            explorer_agents = surrogate_state[self.n_agents//2:, :]
+            exploiter_agents = surrogate_state[:self.n_agents//2, :]
+
+            # add two more exploiter agents to the explorer agents and use the explorer agents for training the surrogate
+            surrogate_state = explorer_agents #np.vstack((explorer_agents, exploiter_agents[:2, :])) 
+
+            #self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
+            self.surrogate.update_model(surrogate_state[:, :-1], surrogate_state[:, -1])
+
 
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
         self.num_of_function_evals += self.n_agents
