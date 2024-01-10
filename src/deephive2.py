@@ -59,7 +59,7 @@ class OptimizationTrainer:
         for key, value in kwargs.items():
             print(key, value)
 
-    def train_agent(self, n_episodes=None, update_timestep=None, decay_rate=None, log_interval=None, decay_interval=None, save_interval=None, min_action_std=None):
+    def train_agent(self, title, n_episodes=None, update_timestep=None, decay_rate=None, log_interval=None, decay_interval=None, save_interval=None, min_action_std=None):
         # if parameters are not provided, use the ones from the config file
         if update_timestep is None:
             update_timestep = self.config["update_timestep"]
@@ -78,6 +78,7 @@ class OptimizationTrainer:
 
         average_returns = []
         training_run_title = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        training_run_title = title + "_" + training_run_title
         save_path = f"training_runs/{training_run_title}/"
         os.makedirs(save_path, exist_ok=True)
         timesteps = 0
@@ -108,22 +109,23 @@ class OptimizationTrainer:
             if timesteps % update_timestep == 0:
                 self.agent_policy.update()
         
-            if timesteps > 0:
+            if timesteps > 0 and episode % log_interval == 0:
                 self.print_items(
                         episode = episode,
                         average_returns = average_returns[-1],
                         timesteps = timesteps,
                     )
-                self.env.surrogate.plot_checkpoints_state(f"{save_path}surrogate-checkpoint-{episode}.png")
-                self.env.surrogate.plot_variance(f"{save_path}variance-{episode}.png")
-                self.env.surrogate.plot_surrogate(f"{save_path}surrogate-{episode}.png")
-                if self.neptune_logger:
-                    self.neptune_logger[f"train/plots/surrogate/surrogate-{episode}"].upload(f"{save_path}surrogate-{episode}.png")
-                    self.neptune_logger[f"train/plots/variance/variance-{episode}"].upload(f"{save_path}variance-{episode}.png")
-                    self.neptune_logger[f"train/plots/surrogate_checker/surrogate-checkpoint-{episode}"].upload(f"{save_path}surrogate-checkpoint-{episode}.png")
+                if self.env.use_surrogate:
+                    self.env.surrogate.plot_checkpoints_state(f"{save_path}surrogate-checkpoint-{episode}.png")
+                    self.env.surrogate.plot_variance(f"{save_path}variance-{episode}.png")
+                    self.env.surrogate.plot_surrogate(f"{save_path}surrogate-{episode}.png")
+                    if self.neptune_logger:
+                        self.neptune_logger[f"train/plots/surrogate/surrogate-{episode}"].upload(f"{save_path}surrogate-{episode}.png")
+                        self.neptune_logger[f"train/plots/variance/variance-{episode}"].upload(f"{save_path}variance-{episode}.png")
+                        self.neptune_logger[f"train/plots/surrogate_checker/surrogate-checkpoint-{episode}"].upload(f"{save_path}surrogate-checkpoint-{episode}.png")
                     
 
-                if self.env.n_dim <= 2:
+                if self.env.n_dim <= 2 and episode % log_interval == 0:
                     self.env.render(file_path=f"{save_path}{episode}.gif", type="history")
                     if self.neptune_logger:
                         self.neptune_logger[f"train/gifs/{episode}.gif"].upload(f"{save_path}{episode}.gif")
@@ -327,6 +329,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_interval", type=int, default=None)
     parser.add_argument("--min_action_std", type=float, default=None)
     parser.add_argument("--iters", type=int, default=10)
+    parser.add_argument("--title", type=str, default="experiment_1")
 
     args = parser.parse_args()
     api_token = os.environ.get("NEPTUNE_API_TOKEN")
@@ -336,7 +339,7 @@ if __name__ == "__main__":
     if args.tags is None:
         args.tags = f"{args.mode}_RUN"
     if args.mode == "train":
-        trainer.train_agent(n_episodes=args.n_episodes, update_timestep=args.update_timestep, decay_rate=args.decay_rate, log_interval=None, decay_interval=args.decay_interval, save_interval=args.save_interval, min_action_std=args.min_action_std)
+        trainer.train_agent(title=args.title, n_episodes=args.n_episodes, update_timestep=args.update_timestep, decay_rate=args.decay_rate, log_interval=None, decay_interval=args.decay_interval, save_interval=args.save_interval, min_action_std=args.min_action_std)
     elif args.mode == "test":
         trainer.test_policy(n_iterations=args.iters, log_interval=args.log_interval)
     elif args.mode == "benchmark":

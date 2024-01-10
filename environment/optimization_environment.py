@@ -146,7 +146,8 @@ class OptimizationEnv(gym.Env):
         assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         self.prev_state = self.state.copy()
         self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
-        _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
+        if self.use_surrogate:
+            _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
         #print(self.prev_agents_pos_std)
         self.prev_obj_values = self.obj_values.copy()
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
