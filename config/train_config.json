@@ -11,7 +11,7 @@
     "reward_scheme": "FullRewardScheme",
     "objective_function":  "GaussianPeakFunction",
     "optimization_type": "maximize",
-    "use_gbest": false,
+    "use_gbest": true,
     "use_optimal_value": true,
     "update_timestep": 20,
     "log_interval": 100,

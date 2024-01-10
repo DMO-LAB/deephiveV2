@@ -15,7 +15,7 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
     if save_gif:
         os.makedirs(result_path, exist_ok=True)
     for iter in range(iters):
-        #print("Iteration: ", iter)
+        print("Iteration: ", iter)
         observation_info = env.reset()
         episode_gbVals = []
         for _ in range(timesteps):
@@ -37,6 +37,7 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
 
 if __name__ == "__main__":
     import argparse 
+    from str2bool import str2bool
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, default="../config/config.json")
     parser.add_argument("--model_path", type=str, default="../models/exploiting_model.pth")
@@ -44,8 +45,9 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="test")
     parser.add_argument("--iters", type=int, default=10)
     parser.add_argument("--timesteps", type=int, default=20)
-    parser.add_argument("--save_gif", type=bool, default=True)
-    parser.add_argument("--split_agents", type=bool, default=True)
+    parser.add_argument("--save_gif", type=str, default=True)
+    parser.add_argument("--split_agents", type=str, default=False)
+    parser.add_argument("--run_summary", type=str, required=True, help="summary of the run")
 
     args = parser.parse_args()
 
@@ -60,15 +62,23 @@ if __name__ == "__main__":
     exp_num = args.exp_num
 
     # ensure split_agents and save_gif are boolean
-    args.split_agents = bool(args.split_agents)
-    args.save_gif = bool(args.save_gif)
+    args.split_agents = str2bool(args.split_agents)
+    args.save_gif = str2bool(args.save_gif)
     
     experiments = [
-        [env1, agent_policy1, f"experiment_{exp_num}", timesteps, iters, args.save_dir, "results/", args.split_agents],
+        [env1, agent_policy1, f"experiment_{exp_num}", timesteps, iters, args.save_gif, "results/", args.split_agents],
     ]
+    
+    print("Experiment parameters: ", args)
 
-    for env, agent_policy, exp_name, timesteps, iters, save_dir, result_path, split_agents in experiments:
+    for env, agent_policy, exp_name, timesteps, iters, save_gif, result_path, split_agents in experiments:
         print("Running experiment: ", exp_name)
-        gbest_values = run_experiment(env, agent_policy, timesteps, iters, save_gif=args.save_gif, result_path=result_path, split_agents=split_agents)
-        np.save(save_dir + exp_name + ".npy", gbest_values)
+        result_path = 'experiments/results/' + exp_name + '/'
+        gbest_values = run_experiment(env, agent_policy, timesteps, iters, save_gif=args.save_gif, result_path=result_path, split_agents=split_agents,
+                                      save_interval=1)
+        np.save(result_path + exp_name + ".npy", gbest_values)
         print("Experiment: ", exp_name, " completed.")
+
+        # save run summary in a text file and in the results folder
+        with open(result_path + "run_summary.txt", "w") as f:
+            f.write(args.run_summary)

@@ -83,7 +83,8 @@ class OptimizationTrainer:
         os.makedirs(save_path, exist_ok=True)
         timesteps = 0
         for episode in range(0, n_episodes+1):
-            print(f"Episode: {episode}")
+            if episode % log_interval == 0:
+                print(f"Episode: {episode}")
             observation_info = self.env.reset()
             episode_return = np.zeros(self.env.n_agents)
             for step in range(self.env.ep_length):
