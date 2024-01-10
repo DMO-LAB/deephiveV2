@@ -2,7 +2,7 @@
 __pycache__
 test.png
 *.csv
-*.pth
+# *.pth
 *.gif
 .DS_Store
 benchmarking_runs
