@@ -1,5 +1,9 @@
 import os 
 import numpy as np
+
+import sys
+print(sys.path)
+
 from environment.deephive_utils import *
 from environment.utils import *
 
@@ -9,7 +13,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--result_path", type=str, default="experiments/results/")
 parser.add_argument("--exp_list", type=str, default="2,3")
-parser.add_argument("--exp_num", type=int, default=1)
+parser.add_argument("--exp_numC", type=int, default=1)
 
 args = parser.parse_args()
 
@@ -46,5 +50,5 @@ for i, exp_num in enumerate(exp_list):
     color_list.append(all_colors[i])
 
 # plot the gbest_values
-plot_num_function_evaluation(fopt=np.array(gbest_values), label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"experiments/results/comparison_{exp_num}.png",
+plot_num_function_evaluation(fopt=np.array(gbest_values), label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"experiments/results/comparison_{args.exp_numC}.png",
                              n_agents=10, opt_value=4.808)

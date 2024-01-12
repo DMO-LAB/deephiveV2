@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 import matplotlib.pyplot as plt
+from environment.utils import filter_points
 
 class GPSurrogateModule:
     def __init__(self, initial_samples, initial_values, kernel=None, **kwargs):
@@ -15,13 +16,19 @@ class GPSurrogateModule:
         """
         self.samples = initial_samples
         self.values = initial_values
-        self.kernel = kernel if kernel is not None else C(1.0, (1e-5, 1e5)) * RBF(1.0, (1e-3, 1e3))
-        self.gp = GaussianProcessRegressor(kernel=self.kernel, n_restarts_optimizer=9)
-        self.gp.fit(self.samples, self.values)
+        self.kernel = kernel if kernel is not None else C(1.0, (1e-3, 1e3)) * RBF(1.0, (1e-3, 1e3))
+        self.clear_gp(initial_samples, initial_values, self.kernel)
         self.bounds = kwargs.get("bounds", np.array([[-1, -1], [1, 1]]))
         
         self.checkpoints = self._initialize_checkpoints()
-        
+    
+    def clear_gp(self, initial_samples, initial_values, kernel):
+        # reset the gp
+        print("Resetting the GP")
+        self.gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=20)
+        self.gp.fit(initial_samples, initial_values)
+
+
     def _initialize_checkpoints(self, resolution=0.05):
         # Define the bounds of the grid
         x_min, y_min = self.bounds[0]
@@ -54,8 +61,11 @@ class GPSurrogateModule:
         - new_values: Values at the new sample points.
         """
         self.samples = np.vstack([self.samples, new_samples])
-        #print(self.samples.shape)
         self.values = np.append(self.values, new_values)
+        # add self.value as a third dimension to self.samples
+        self.samples = np.hstack([self.samples, self.values.reshape(-1, 1)])
+        self.samples = filter_points(self.samples, min_distance=0.1)
+        self.samples, self.values = self.samples[:, :-1], self.samples[:, -1]
         self.gp.fit(self.samples, self.values)
         #print(f"Updated GP model with {self.samples.shape[0]} new samples.")
 
@@ -222,7 +232,7 @@ class GPSurrogateModule:
 
         return mse, rmse
         
-    def check_checkpoints(self, alpha=1, percentile=85):
+    def check_checkpoints(self, alpha=1, percentile=95):
         self.checkpoints_mean, self.checkpoints_std = self.evaluate(self.checkpoints, scale=True)
         mean_std = np.array(self.checkpoints_mean) + np.array(self.checkpoints_std) * alpha
         

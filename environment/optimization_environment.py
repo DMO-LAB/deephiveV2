@@ -7,8 +7,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from environment.optimization_functions import OptimizationFunctionBase
 from environment.observation_schemes import ObservationScheme
 from environment.reward_schemes import RewardScheme
-from environment.utils import parse_config, ScalingHelper, Render
+from environment.utils import parse_config, ScalingHelper, Render, filter_points
 from exploration.gaussian_mixture import ExplorationModule
+from environment.utils import initialize_grid
 from exploration.gp_surrogate import GPSurrogateModule
     
     
@@ -74,6 +75,7 @@ class OptimizationEnv(gym.Env):
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
             self.mode = self.config["mode"] if "mode" in self.config else "exploration"
+            self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.1
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -124,9 +126,17 @@ class OptimizationEnv(gym.Env):
         self.pbest = self._get_actual_state()
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
+        self.surrogate_states_buffer = []
+        self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution)
+        # scale the grid points
+        self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
+
         actual_samples = self._get_actual_state()
+        self.evaluated_points = self.state[:, :-1].copy() # scaled points
+        self.surrogate_states_buffer.append(actual_samples)
         self.ids_true_function_eval = np.arange(self.n_agents)
         if self.use_surrogate:
+            #print("Instantiating the surrogate")
             self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds) 
             _, self.agents_pos_std = self.surrogate.evaluate(actual_samples[:, :-1], scale=True)
             self.prev_agents_pos_std = self.agents_pos_std.copy()
@@ -135,7 +145,7 @@ class OptimizationEnv(gym.Env):
         else:
             observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
 
-
+        
     
         return observation
     
@@ -168,13 +178,16 @@ class OptimizationEnv(gym.Env):
             _ , self.agents_pos_std = self.surrogate.evaluate(self.state[:, :-1], scale=True)
             # if agents are too close to each other, select only one for training the surrogate
             surrogate_state = self.state.copy()
-            explorer_agents = surrogate_state[self.n_agents//2:, :]
-            exploiter_agents = surrogate_state[:self.n_agents//2, :]
+            # explorer_agents = surrogate_state[self.n_agents//2:, :]
+            # exploiter_agents = surrogate_state[:self.n_agents//2, :]
 
-            # add two more exploiter agents to the explorer agents and use the explorer agents for training the surrogate
-            surrogate_state = explorer_agents #np.vstack((explorer_agents, exploiter_agents[:2, :])) 
-
+            # # add two more exploiter agents to the explorer agents and use the explorer agents for training the surrogate
+            # surrogate_state = explorer_agents #np.vstack((explorer_agents, exploiter_agents[:2, :])) 
+            surrogate_state = filter_points(surrogate_state, min_distance=0.1)
+            self.surrogate_states_buffer.append(surrogate_state)
             #self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
+            # print(f"Length of surrogate state: {surrogate_state.shape[0]}")
+            # print(f"Surrogate state: {surrogate_state}")
             self.surrogate.update_model(surrogate_state[:, :-1], surrogate_state[:, -1])
 
 
@@ -187,6 +200,7 @@ class OptimizationEnv(gym.Env):
         self._update_pbest()
         self._update_done_flag()
 
+        self.evaluated_points = np.vstack((self.evaluated_points, self.state[:, :-1])).copy() # scaled points
         agents_done = np.array([self.done for _ in range(self.n_agents)])
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
@@ -215,7 +229,7 @@ class OptimizationEnv(gym.Env):
         """
         try:
             if type == "state":
-                self.render_helper.render_state()
+                self.render_helper.render_state(file_path)
             elif type == "history":
                 self.render_helper.render_state_history(file_path=file_path, fps=fps)
             elif type == "surrogate":
@@ -260,7 +274,7 @@ class OptimizationEnv(gym.Env):
             "best_obj_value": self.best_obj_value,
             "worst_obj_value": self.worst_obj_value,
             "best_agent": self.best_agent,
-            "actual_state": self._get_actual_state(),
+            "new_evaluated": self._get_actual_state(),
             "current_step": self.current_step,
             "done": self.done,
             "opt_value": self.opt_value,

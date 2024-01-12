@@ -1,6 +1,41 @@
 import numpy as np
 from policies.mappo import MAPPO
 from environment.optimization_environment import OptimizationEnv
+from scipy.spatial.distance import cdist
+from matplotlib import pyplot as plt
+
+def filter_points(points, min_distance):
+    """
+    Efficiently filter points along with their function output to ensure minimum distance between them
+    using vectorized operations.
+    
+    :param points_with_output: A numpy array of points with the last dimension being the function output.
+    :param min_distance: The minimum allowed distance between any two points, ignoring the output value.
+    :return: A numpy array of filtered points with their output.
+    """
+    # Separate the coordinates and outputs
+    coordinates = points[:, :-1]
+    _ = points[:, -1]
+    
+    # Calculate the condensed distance matrix between points
+    distance_matrix = cdist(coordinates, coordinates, 'euclidean')
+    
+    # We only care about the upper triangle of the distance matrix, since it is symmetric.
+    # We also fill the diagonal with np.inf to ignore zero distance to itself.
+    np.fill_diagonal(distance_matrix, np.inf)
+    
+    # Filter points that are too close to each other
+    filtered_indices = np.full(len(coordinates), True)
+    for i in range(len(coordinates)):
+        if filtered_indices[i]:
+            # Find points that are too close to the current point and mark them as False
+            too_close_indices = np.where(distance_matrix[i] < min_distance)[0]
+            filtered_indices[too_close_indices] = False
+            # Ensure the current point is always kept
+            filtered_indices[i] = True
+    
+    return points[filtered_indices]
+
 
 def initialize(config_path, mode="train", **kwargs):
     env = OptimizationEnv(config_path)
@@ -26,22 +61,79 @@ def get_action(observation_info, agent_policy, env):
         actions[:, dim] = action
     return actions
 
-def get_informed_action(env):
-    # let the action be the distance it takes for the agents to get to the a random point in the high std points
+def get_action(observation_info, agent_policy, env):
+    observation, observation_std = observation_info
     actions = np.zeros((env.n_agents, env.n_dim))
-    high_std_points, _ = env._get_unexplored_area()
-    taken_points_index = []
-    for agents in range(env.n_agents):
-        while True:
-            index = np.random.randint(0, high_std_points.shape[0])
-            if index not in taken_points_index:
-                taken_points_index.append(index)
-                break
-        agent_target = high_std_points[index]
-        # get the difference between the agent's current position and the target
-        diff = agent_target - env.state[agents][:env.n_dim]
-        # add noise to the action
-        actions[agents] = diff #+ np.random.normal(-0.1, 0.1, size=env.n_dim)
-
+    for dim in range(env.n_dim):
+        observation[dim] = observation[dim].astype(np.float32)
+        observation_std[dim] = observation_std[dim].astype(np.float32)
+        action = agent_policy.select_action(observation[dim], observation_std[dim])
+        actions[:, dim] = action
     return actions
+
+def select_candidate_points(grid_points, evaluated_points, n_select):
+    next_candidate_points = []
+    # Calculate all distances
+    for n in range(n_select):
+        distances = cdist(grid_points, evaluated_points)
+
+        # Find minimum distance to evaluated points for each grid point
+        min_distances = np.min(distances, axis=1)
+
+        # Select new points (farthest points first)
+        indices_to_select = np.argmax(min_distances)
+        new_evaluated = grid_points[indices_to_select]
+        evaluated_points = np.vstack([evaluated_points, new_evaluated])
+        next_candidate_points.append(new_evaluated)
+
+    return evaluated_points, np.array(next_candidate_points)
+
+def check_proximity(checkpoint, target_array, threshold=0.01):
+    # check if the point is very close to any of the points in the target_array
+    if len(target_array) == 0:
+        return False
+    for target in target_array:
+        if np.linalg.norm(checkpoint - target) < threshold:
+            return True
+    return False
+
+def get_informed_action(env, number_of_points=5):
+    # let the action be the distance it takes for the agents to get to the a random point in the high std points
+    grid_points = env.grid_points
+    actions = np.zeros((number_of_points, env.n_dim))
+    evaluated_points = env.evaluated_points
+    # get the next candidate points
+    evaluated_points, next_candidate_points = select_candidate_points(grid_points, evaluated_points, number_of_points)
+                                                                      
+    # scale the next candidate points to the bounds of the environment
+    #next_candidate_points = env.scaler_helper.scale(next_candidate_points, env.min_pos, env.max_pos)
+    actions = next_candidate_points - env.state[number_of_points:, :env.n_dim]
+
+    return actions, next_candidate_points
         
+def plot_point(grid_points, evaluated_points, new_evaluated,save_dir=None):
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
+    ax.scatter(grid_points[:, 0], grid_points[:, 1], s=20, color='black', label="Checkpoints")
+    ax.scatter(evaluated_points[:, 0], evaluated_points[:, 1], s=60, color='red', label="Evaluated Points")
+    if new_evaluated is not None:
+        ax.scatter(new_evaluated[:, 0], new_evaluated[:, 1], s=60, color='green', label="New Evaluated Points")
+    plt.legend()
+    if save_dir is not None:
+        plt.savefig(save_dir)
+    else:
+        plt.show()
+    # high_std_points, _ = env._get_unexplored_area()
+    # taken_points_index = []
+    # for agents in range(env.n_agents):
+    #     while True:
+    #         index = np.random.randint(0, high_std_points.shape[0])
+    #         if index not in taken_points_index and not check_proximity(high_std_points[index], taken_points_index, threshold):
+    #             taken_points_index.append(index)
+    #             break
+
+    #     agent_target = high_std_points[index]
+
+    #     # get the difference between the agent's current position and the target
+    #     diff = agent_target - env.state[agents][:env.n_dim]
+    #     # add noise to the action
+    #     actions[agents] = diff #+ np.random.normal(-0.1, 0.1, size=env.n_dim)

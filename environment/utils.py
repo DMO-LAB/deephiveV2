@@ -184,16 +184,16 @@ class Render:
     def __init__(self, env):
         self.env = env
         
-    def render_state(self):
+    def render_state(self, file_path: Optional[str] = None):
         if self.env.n_dim > 2:
             raise ValueError("Cannot render state for n_dim > 2")
         
         if self.env.n_dim == 1:
-            self._render_state_1d()
+            self._render_state_1d(file_path )
         else:
-            self._render_state_2d()
+            self._render_state_2d(file_path)
             
-    def _render_state_1d(self):
+    def _render_state_1d(self, file_path: Optional[str] = None):
         fig, ax = plt.subplots()
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = self.env.objective_function.evaluate(x)
@@ -205,10 +205,13 @@ class Render:
         ax.set_title("Particle positions")
         state = self.env._get_actual_state()
         ax.scatter(state, np.zeros_like(state), c="red", s=10)
-        plt.show()
+        if file_path is not None:
+            plt.savefig(file_path)
+        else:
+            plt.show()
 
         
-    def _render_state_2d(self):
+    def _render_state_2d(self, file_path: Optional[str] = None):
         fig, ax = plt.subplots()
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
@@ -227,8 +230,10 @@ class Render:
         ax.scatter(state[novel_id, 0], state[novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="novel points", alpha=1)
         ax.scatter(state[~novel_id, 0], state[~novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="non-novel points", alpha=1)
         
-        plt.savefig("test.png")
-        #plt.show()
+        if file_path is not None:
+            plt.savefig(file_path)
+        else:
+            plt.show()
         
     
     def render_state_history(self, file_path: str, fps: int = 10):
@@ -288,3 +293,74 @@ class Render:
         anim.save(file_path, writer="Pillow")
             
     
+from scipy.spatial.distance import cdist
+
+def filter_points(points, min_distance):
+    """
+    Efficiently filter points along with their function output to ensure minimum distance between them
+    using vectorized operations.
+    
+    :param points_with_output: A numpy array of points with the last dimension being the function output.
+    :param min_distance: The minimum allowed distance between any two points, ignoring the output value.
+    :return: A numpy array of filtered points with their output.
+    """
+    # Separate the coordinates and outputs
+    coordinates = points[:, :-1]
+    _ = points[:, -1]
+    
+    # Calculate the condensed distance matrix between points
+    distance_matrix = cdist(coordinates, coordinates, 'euclidean')
+    
+    # We only care about the upper triangle of the distance matrix, since it is symmetric.
+    # We also fill the diagonal with np.inf to ignore zero distance to itself.
+    np.fill_diagonal(distance_matrix, np.inf)
+    
+    # Filter points that are too close to each other
+    filtered_indices = np.full(len(coordinates), True)
+    for i in range(len(coordinates)):
+        if filtered_indices[i]:
+            # Find points that are too close to the current point and mark them as False
+            too_close_indices = np.where(distance_matrix[i] < min_distance)[0]
+            filtered_indices[too_close_indices] = False
+            # Ensure the current point is always kept
+            filtered_indices[i] = True
+    
+    return points[filtered_indices]
+
+def select_candidate_points(grid_points, evaluated_points, n_select):
+    next_candidate_points = []
+    # Calculate all distances
+    for n in range(n_select):
+        distances = cdist(grid_points, evaluated_points)
+
+        # Find minimum distance to evaluated points for each grid point
+        min_distances = np.min(distances, axis=1)
+
+        # Select new points (farthest points first)
+        indices_to_select = np.argmax(min_distances)
+        new_evaluated = grid_points[indices_to_select]
+        evaluated_points = np.vstack([evaluated_points, new_evaluated])
+        next_candidate_points.append(new_evaluated)
+
+    return evaluated_points, np.array(next_candidate_points)
+
+def initialize_grid(bounds, resolution):
+        # Define the bounds of the grid
+        x_min, y_min = bounds[0]
+        x_max, y_max = bounds[1]
+        # Create a meshgrid of x and y values within the bounds
+        x_values = np.arange(x_min, x_max + resolution, resolution)
+        y_values = np.arange(y_min, y_max + resolution, resolution)
+        xx, yy = np.meshgrid(x_values, y_values)
+
+        # Flatten the meshgrid to get the individual x and y coordinates
+        x_coordinates = xx.flatten()
+        y_coordinates = yy.flatten()
+
+        # Create a list of points as (x, y) tuples
+        points = list(zip(x_coordinates, y_coordinates))
+
+        # Convert the list of points to a NumPy array
+        points_array = np.array(points)
+        
+        return points_array
