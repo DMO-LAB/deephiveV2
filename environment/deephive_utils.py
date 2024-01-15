@@ -107,7 +107,7 @@ def get_informed_action(env, number_of_points=5):
                                                                       
     # scale the next candidate points to the bounds of the environment
     #next_candidate_points = env.scaler_helper.scale(next_candidate_points, env.min_pos, env.max_pos)
-    actions = next_candidate_points - env.state[number_of_points:, :env.n_dim]
+    actions = next_candidate_points - env.state[(10-number_of_points):, :env.n_dim]
 
     return actions, next_candidate_points
         

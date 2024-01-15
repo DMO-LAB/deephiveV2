@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_path="experiment/", save_interval=10,
-                   split_agents=True, threshold=0.1, save_surrogate_plots=False, sur_debug=False):
+                   split_agents=True, threshold=0.1, save_surrogate_plots=False, sur_debug=False, number_of_points=6):
     gbest_values = []
     if save_gif:
         os.makedirs(result_path, exist_ok=True)
@@ -27,10 +27,10 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
                 env.render(type="state", file_path=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_state_.png")
             episode_gbVals.append(env.gbest[-1])
             exploiters_action =  get_action(observation_info, agent_policy, env)
-            explorer_action, next_point = get_informed_action(env, number_of_points=env.n_agents//2)
+            explorer_action, next_point = get_informed_action(env, number_of_points=number_of_points)
             actions = np.zeros((env.n_agents, env.n_dim))
-            actions[:env.n_agents//2] = exploiters_action[:env.n_agents//2]
-            actions[env.n_agents//2:] = explorer_action
+            actions[:(env.n_agents - number_of_points)] = exploiters_action[:(env.n_agents - number_of_points)]
+            actions[(env.n_agents - number_of_points):] = explorer_action
             observation_info, reward, done, info = env.step(actions)
             if split_agents == False and i == 4:
                 agent_policy.set_action_std(0.02)
@@ -47,13 +47,13 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
             env.surrogate.plot_variance(save_dir=result_path + "iter_" + str(iter) + "_variance.png")
             env.surrogate.plot_checkpoints_state(save_dir=result_path + "iter_" + str(iter) + "_checkpoints.png")
         # SAVE the surrogate state buffer to file
-        buffer = []
-        for buff in env.surrogate_states_buffer:
-            for bu in buff:
-                buffer.append(bu)
-        # reset the shape of the buffer
-        buffer = np.array(buffer)
-        np.save(result_path + "iter_" + str(iter) + "_buffer.npy", buffer)           
+        # buffer = []
+        # for buff in env.surrogate_states_buffer:
+        #     for bu in buff:
+        #         buffer.append(bu)
+        # # reset the shape of the buffer
+        # buffer = np.array(buffer)
+        # #np.save(result_path + "iter_" + str(iter) + "_buffer.npy", buffer)           
 
     return gbest_values, gp_Info
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default="../models/exploiting_model.pth")
     parser.add_argument("--exp_num", type=int, default=1)
     parser.add_argument("--mode", type=str, default="test")
-    parser.add_argument("--iters", type=int, default=10)
+    parser.add_argument("--iters", type=int, default=100)
     parser.add_argument("--timesteps", type=int, default=20)
     parser.add_argument("--save_gif", type=str, default=True)
     parser.add_argument("--split_agents", type=str, default=False)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         
         result_path = 'experiments/results/' + exp_name + '/'
         gbest_values, gp_Info = run_experiment(env, agent_policy, timesteps, iters, save_gif=args.save_gif, result_path=result_path, split_agents=split_agents,
-                                      save_interval=4, save_surrogate_plots=args.save_surrogate_plots, sur_debug=args.sur_debug)
+                                      save_interval=10, save_surrogate_plots=args.save_surrogate_plots, sur_debug=args.sur_debug)
         np.save(result_path + exp_name + ".npy", gbest_values)
         print("Experiment: ", exp_name, " completed.")
 

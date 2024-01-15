@@ -16,7 +16,7 @@ class GPSurrogateModule:
         """
         self.samples = initial_samples
         self.values = initial_values
-        self.kernel = kernel if kernel is not None else C(1.0, (1e-3, 1e3)) * RBF(1.0, (1e-3, 1e3))
+        self.kernel = 1.0 * RBF(length_scale = 1, length_scale_bounds =  (0.999, 1.01))
         self.clear_gp(initial_samples, initial_values, self.kernel)
         self.bounds = kwargs.get("bounds", np.array([[-1, -1], [1, 1]]))
         

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Define variables
-exp_num1=22
+exp_num1=32
 exp_num2=$((exp_num1 + 1))
 
-exp_numC=14
+exp_numC=19
 
 # Activate the virtual environment
 workon DLEnv
