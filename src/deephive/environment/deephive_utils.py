@@ -112,28 +112,29 @@ def get_informed_action(env, number_of_points=5):
     return actions, next_candidate_points
         
 def plot_point(grid_points, evaluated_points, new_evaluated,save_dir=None):
-    fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
-    ax.scatter(grid_points[:, 0], grid_points[:, 1], s=20, color='black', label="Checkpoints")
-    ax.scatter(evaluated_points[:, 0], evaluated_points[:, 1], s=60, color='red', label="Evaluated Points")
-    if new_evaluated is not None:
-        ax.scatter(new_evaluated[:, 0], new_evaluated[:, 1], s=60, color='green', label="New Evaluated Points")
-    plt.legend()
-    if save_dir is not None:
-        plt.savefig(save_dir)
+    if len(grid_points[0]) == 2:
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
+        ax.scatter(grid_points[:, 0], grid_points[:, 1], s=20, color='black', label="Checkpoints")
+        ax.scatter(evaluated_points[:, 0], evaluated_points[:, 1], s=60, color='red', label="Evaluated Points")
+        if new_evaluated is not None:
+            ax.scatter(new_evaluated[:, 0], new_evaluated[:, 1], s=60, color='green', label="New Evaluated Points")
+        plt.legend()
+        if save_dir is not None:
+            plt.savefig(save_dir)
+        else:
+            plt.show()
+    elif len(grid_points[0]) == 3:
+        fig = plt.figure(figsize=(10, 10), dpi=100)
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(grid_points[:, 0], grid_points[:, 1], grid_points[:, 2], s=20, color='black', label="Checkpoints")
+        ax.scatter(evaluated_points[:, 0], evaluated_points[:, 1], evaluated_points[:, 2], s=60, color='red', label="Evaluated Points")
+        if new_evaluated is not None:
+            ax.scatter(new_evaluated[:, 0], new_evaluated[:, 1], new_evaluated[:, 2], s=60, color='green', label="New Evaluated Points")
+        plt.legend()
+        if save_dir is not None:
+            plt.savefig(save_dir)
+        else:
+            plt.show()
     else:
-        plt.show()
-    # high_std_points, _ = env._get_unexplored_area()
-    # taken_points_index = []
-    # for agents in range(env.n_agents):
-    #     while True:
-    #         index = np.random.randint(0, high_std_points.shape[0])
-    #         if index not in taken_points_index and not check_proximity(high_std_points[index], taken_points_index, threshold):
-    #             taken_points_index.append(index)
-    #             break
-
-    #     agent_target = high_std_points[index]
-
-    #     # get the difference between the agent's current position and the target
-    #     diff = agent_target - env.state[agents][:env.n_dim]
-    #     # add noise to the action
-    #     actions[agents] = diff #+ np.random.normal(-0.1, 0.1, size=env.n_dim)
+        raise ValueError("Grid points must be 2 or 3 dimensional")
+    plt.close()

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 import matplotlib.pyplot as plt
-from deephive.environment.utils import filter_points
+from deephive.environment.utils import filter_points, initialize_grid
 
 class GPSurrogateModule:
     def __init__(self, initial_samples, initial_values, kernel=None, **kwargs):
@@ -16,7 +16,7 @@ class GPSurrogateModule:
         """
         self.samples = initial_samples
         self.values = initial_values
-        self.kernel = 1.0 * RBF(length_scale = 1, length_scale_bounds =  (0.999, 1.01))
+        self.kernel = kernel if kernel is not None else C(1.0, (1e-3, 1e3)) * RBF(1.0, (1e-3, 1e3))
         self.clear_gp(initial_samples, initial_values, self.kernel)
         self.bounds = kwargs.get("bounds", np.array([[-1, -1], [1, 1]]))
         
@@ -29,28 +29,14 @@ class GPSurrogateModule:
         self.gp.fit(initial_samples, initial_values)
 
 
-    def _initialize_checkpoints(self, resolution=0.05):
-        # Define the bounds of the grid
-        x_min, y_min = self.bounds[0]
-        x_max, y_max = self.bounds[1]
-    
+    def _initialize_checkpoints(self, resolution=0.2):
+        """
+        Initialize the checkpoints for the GP model.
 
-        # Create a meshgrid of x and y values within the bounds
-        x_values = np.arange(x_min, x_max + resolution, resolution)
-        y_values = np.arange(y_min, y_max + resolution, resolution)
-        xx, yy = np.meshgrid(x_values, y_values)
-
-        # Flatten the meshgrid to get the individual x and y coordinates
-        x_coordinates = xx.flatten()
-        y_coordinates = yy.flatten()
-
-        # Create a list of points as (x, y) tuples
-        points = list(zip(x_coordinates, y_coordinates))
-
-        # Convert the list of points to a NumPy array
-        points_array = np.array(points)
-        
-        return points_array
+        Parameters:
+        - resolution: The resolution of the grid.
+        """
+        return initialize_grid(self.bounds, resolution, len(self.bounds[0]))
 
     def update_model(self, new_samples, new_values):
         """
@@ -97,9 +83,12 @@ class GPSurrogateModule:
             # Plot for 2D data
             self.__plot_2d(save_dir)
         else:
-            # For higher dimensions, visualize a 2D slice or projection
-            print("Data is higher than 2D. Plotting a 2D slice.")
-            self.__plot_higher_dims()
+            try:
+                # For higher dimensions, visualize a 2D slice or projection
+                print("Data is higher than 2D. Plotting a 2D slice.")
+                self.__plot_higher_dims()
+            except NotImplementedError:
+                print("Plotting higher dimensional data is not implemented yet.")
 
     def __plot_1d(self, save_dir="gp_surrogate_1d.png"):
         x = np.linspace(self.bounds[0][0], self.bounds[1][0], 1000)
@@ -155,9 +144,13 @@ class GPSurrogateModule:
             # Plot for 2D data
             self.__plot_2d_variance(save_dir)
         else:
-            # For higher dimensions, visualize a 2D slice or projection
-            print("Data is higher than 2D. Plotting a 2D slice.")
-            self.__plot_higher_dims()
+            try:
+                # For higher dimensions, visualize a 2D slice or projection
+                print("Data is higher than 2D. Plotting a 2D slice.")
+                self.__plot_higher_dims()
+            except NotImplementedError:
+                print("Plotting higher dimensional data is not implemented yet.")
+                
 
     def __plot_1d_variance(self, save_dir="gp_surrogate_variance_1d.png"):
         x = np.linspace(self.bounds[0], self.bounds[1], 1000)
@@ -265,20 +258,57 @@ class GPSurrogateModule:
         # calculate the 
         
     def plot_checkpoints_state(self, save_dir=None):
-        
-        if not hasattr(self, "high_std_points"):
-            self.check_checkpoints()
-        
-        fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
-        ax.scatter(self.checkpoints[:, 0], self.checkpoints[:, 1], s=10, color='black', label="Checkpoints")
-        ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], s=30, color='red', label="High Std")
-        # overlay the sampled points on the plot
-        ax.scatter(self.samples[:, 0], self.samples[:, 1], s=50, color='green', label="Sampled Points")
-        ax.set_xlabel('X-axis')
-        ax.set_ylabel('Y-axis')
-        ax.set_title('Grid of Points')
-        ax.grid(True)
-        if save_dir is not None:
-            plt.savefig(save_dir)
+        dim = self.checkpoints.shape[1]
+        if dim == 1:
+            self.plot_checkpoints_state_1d(save_dir)
+        elif dim == 2:
+            self.plot_checkpoints_state_2d(save_dir)
+        elif dim == 3:
+            self.plot_checkpoints_state_3d(save_dir)
         else:
-            plt.show()
+            print("Plotting checkpoints state for higher dimensions is not implemented yet.")
+        
+    def plot_checkpoints_state_2d(self, save_dir=None):
+        
+        try:
+            if not hasattr(self, "high_std_points"):
+                self.check_checkpoints()
+            
+            fig, ax = plt.subplots(figsize=(10, 10), dpi=100)
+            ax.scatter(self.checkpoints[:, 0], self.checkpoints[:, 1], s=10, color='black', label="Checkpoints")
+            ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], s=30, color='red', label="High Std")
+            # overlay the sampled points on the plot
+            ax.scatter(self.samples[:, 0], self.samples[:, 1], s=50, color='green', label="Sampled Points")
+            ax.set_xlabel('X-axis')
+            ax.set_ylabel('Y-axis')
+            ax.set_title('Grid of Points')
+            ax.grid(True)
+            if save_dir is not None:
+                plt.savefig(save_dir)
+            else:
+                plt.show()
+        except Exception as e:
+            print("Error plotting checkpoints state: ", e)
+
+    def plot_checkpoints_state_3d(self, save_dir=None):
+        try:
+            if not hasattr(self, "high_std_points"):
+                self.check_checkpoints()
+            
+            fig = plt.figure(figsize=(10, 10), dpi=100)
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(self.checkpoints[:, 0], self.checkpoints[:, 1], self.checkpoints[:, 2], s=10, color='black', label="Checkpoints")
+            ax.scatter(self.high_std_points[:, 0], self.high_std_points[:, 1], self.high_std_points[:, 2], s=30, color='red', label="High Std")
+            # overlay the sampled points on the plot
+            ax.scatter(self.samples[:, 0], self.samples[:, 1], self.samples[:, 2], s=50, color='green', label="Sampled Points")
+            ax.set_xlabel('X-axis')
+            ax.set_ylabel('Y-axis')
+            ax.set_zlabel('Z-axis')
+            ax.set_title('Grid of Points')
+            ax.grid(True)
+            if save_dir is not None:
+                plt.savefig(save_dir)
+            else:
+                plt.show()
+        except Exception as e:
+            print("Error plotting checkpoints state: ", e)

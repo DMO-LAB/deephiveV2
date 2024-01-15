@@ -344,23 +344,21 @@ def select_candidate_points(grid_points, evaluated_points, n_select):
 
     return evaluated_points, np.array(next_candidate_points)
 
-def initialize_grid(bounds, resolution):
-        # Define the bounds of the grid
-        x_min, y_min = bounds[0]
-        x_max, y_max = bounds[1]
-        # Create a meshgrid of x and y values within the bounds
-        x_values = np.arange(x_min, x_max + resolution, resolution)
-        y_values = np.arange(y_min, y_max + resolution, resolution)
-        xx, yy = np.meshgrid(x_values, y_values)
 
-        # Flatten the meshgrid to get the individual x and y coordinates
-        x_coordinates = xx.flatten()
-        y_coordinates = yy.flatten()
+def initialize_grid(bounds, resolution, n_dim):
+    # Ensure bounds are provided for each dimension
+    if len(bounds[0]) != n_dim:
+        raise ValueError("Bounds length must match the number of dimensions")
 
-        # Create a list of points as (x, y) tuples
-        points = list(zip(x_coordinates, y_coordinates))
+    # Generate grid points for each dimension
+    grid_ranges = [np.arange(bounds[0][dim], bounds[1][dim] + resolution, resolution) for dim in range(n_dim)]
 
-        # Convert the list of points to a NumPy array
-        points_array = np.array(points)
-        
-        return points_array
+    # Create a meshgrid for the given dimensions
+    grids = np.meshgrid(*grid_ranges, indexing='ij')
+
+    # Flatten and combine the grids to create a list of points
+    points = np.vstack([grid.flatten() for grid in grids]).T
+
+    print(f"Number of grid points: {len(points)}")
+    print(points.shape)
+    return points
