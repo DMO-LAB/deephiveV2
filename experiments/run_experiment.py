@@ -1,7 +1,7 @@
 import sys 
 sys.path.append('../')
-from environment.deephive_utils import *
-from environment.utils import *
+from deephive.environment.deephive_utils import *
+from deephive.environment.utils import *
 from dotenv import load_dotenv
 load_dotenv()
 import os 
@@ -45,15 +45,7 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
         if save_surrogate_plots and iter % save_interval == 0:
             env.surrogate.plot_surrogate(save_dir=result_path + "iter_" + str(iter) + ".png")
             env.surrogate.plot_variance(save_dir=result_path + "iter_" + str(iter) + "_variance.png")
-            env.surrogate.plot_checkpoints_state(save_dir=result_path + "iter_" + str(iter) + "_checkpoints.png")
-        # SAVE the surrogate state buffer to file
-        # buffer = []
-        # for buff in env.surrogate_states_buffer:
-        #     for bu in buff:
-        #         buffer.append(bu)
-        # # reset the shape of the buffer
-        # buffer = np.array(buffer)
-        # #np.save(result_path + "iter_" + str(iter) + "_buffer.npy", buffer)           
+            env.surrogate.plot_checkpoints_state(save_dir=result_path + "iter_" + str(iter) + "_checkpoints.png")       
 
     return gbest_values, gp_Info
 
@@ -65,7 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default="../models/exploiting_model.pth")
     parser.add_argument("--exp_num", type=int, default=1)
     parser.add_argument("--mode", type=str, default="test")
-    parser.add_argument("--iters", type=int, default=100)
+    parser.add_argument("--iters", type=int, default=1)
     parser.add_argument("--timesteps", type=int, default=20)
     parser.add_argument("--save_gif", type=str, default=True)
     parser.add_argument("--split_agents", type=str, default=False)

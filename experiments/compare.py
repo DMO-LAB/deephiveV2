@@ -4,9 +4,8 @@ import numpy as np
 import sys
 print(sys.path)
 
-from environment.deephive_utils import *
-from environment.utils import *
-
+from deephive.environment.deephive_utils import *
+from deephive.environment.utils import *
 
 import argparse
 

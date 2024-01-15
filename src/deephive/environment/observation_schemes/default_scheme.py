@@ -1,5 +1,5 @@
-from environment.observation_schemes import ObservationScheme
-from environment.utils import ScalingHelper
+from deephive.environment.observation_schemes import ObservationScheme
+from deephive.environment.utils import ScalingHelper
 import numpy as np
 
 scaler = ScalingHelper()

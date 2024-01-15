@@ -4,13 +4,13 @@ from gymnasium import spaces
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Any, Dict, List, Optional, Tuple
-from environment.optimization_functions import OptimizationFunctionBase
-from environment.observation_schemes import ObservationScheme
-from environment.reward_schemes import RewardScheme
-from environment.utils import parse_config, ScalingHelper, Render, filter_points
-from exploration.gaussian_mixture import ExplorationModule
-from environment.utils import initialize_grid
-from exploration.gp_surrogate import GPSurrogateModule
+from deephive.environment.optimization_functions import OptimizationFunctionBase
+from deephive.environment.observation_schemes import ObservationScheme
+from deephive.environment.reward_schemes import RewardScheme
+from deephive.environment.utils import parse_config, ScalingHelper, Render, filter_points
+# from exploration.gaussian_mixture import ExplorationModule
+from deephive.environment.utils import initialize_grid
+from deephive.exploration.gp_surrogate import GPSurrogateModule
     
     
 class OptimizationEnv(gym.Env):
@@ -54,7 +54,7 @@ class OptimizationEnv(gym.Env):
         # Configuration code from the original __init__ method
         try:
             self.env_name = self.config["env_name"]
-            self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "environment.optimization_functions"), self.config["objective_function"])()
+            self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "deephive.environment.optimization_functions"), self.config["objective_function"])()
             self.n_agents = self.config["n_agents"]
             self.n_dim = self.config["n_dim"]
             self.bounds:Tuple[np.ndarray] = self.objective_function.bounds(self.n_dim)
@@ -65,8 +65,8 @@ class OptimizationEnv(gym.Env):
             self.freeze = self.config["freeze"]
             self.optimization_type: str = self.config["optimization_type"] # optimization type: "minimize" or "maximize"
             self.opt_value = self.objective_function.optimal_value(self.n_dim)
-            self.observation_schemes: ObservationScheme = getattr(importlib.import_module(".barrel", "environment.observation_schemes"), self.config["observation_scheme"])(self)
-            self.reward_schemes:RewardScheme = getattr(importlib.import_module(".barrel", "environment.reward_schemes"), self.config["reward_scheme"])(self)
+            self.observation_schemes: ObservationScheme = getattr(importlib.import_module(".barrel", "deephive.environment.observation_schemes"), self.config["observation_scheme"])(self)
+            self.reward_schemes:RewardScheme = getattr(importlib.import_module(".barrel", "deephive.environment.reward_schemes"), self.config["reward_scheme"])(self)
             self.scaler_helper = ScalingHelper()
             self.render_helper = Render(self)
             self.use_gbest = self.config["use_gbest"]
@@ -126,14 +126,14 @@ class OptimizationEnv(gym.Env):
         self.pbest = self._get_actual_state()
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
-        self.surrogate_states_buffer = []
+        # self.surrogate_states_buffer = []
         self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution)
         # scale the grid points
         self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
 
         actual_samples = self._get_actual_state()
         self.evaluated_points = self.state[:, :-1].copy() # scaled points
-        self.surrogate_states_buffer.append(actual_samples)
+        # self.surrogate_states_buffer.append(actual_samples)
         self.ids_true_function_eval = np.arange(self.n_agents)
         if self.use_surrogate:
             #print("Instantiating the surrogate")
@@ -184,10 +184,8 @@ class OptimizationEnv(gym.Env):
             # # add two more exploiter agents to the explorer agents and use the explorer agents for training the surrogate
             # surrogate_state = explorer_agents #np.vstack((explorer_agents, exploiter_agents[:2, :])) 
             surrogate_state = filter_points(surrogate_state, min_distance=0.1)
-            self.surrogate_states_buffer.append(surrogate_state)
+            # self.surrogate_states_buffer.append(surrogate_state)
             #self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
-            # print(f"Length of surrogate state: {surrogate_state.shape[0]}")
-            # print(f"Surrogate state: {surrogate_state}")
             self.surrogate.update_model(surrogate_state[:, :-1], surrogate_state[:, -1])
 
 
@@ -305,7 +303,6 @@ class OptimizationEnv(gym.Env):
                 #print(f"Best objective value: {self.best_obj_value} is greater than the optimal value: {self.opt_value}")
             else:
                 self.done = False
-        
         else:
             self.done = False
             
@@ -433,7 +430,6 @@ class OptimizationEnv(gym.Env):
             for agent in range(self.n_agents):
                 # Get the objective values from state_history for the specified range of steps
                 past_obj_values = self.state_history[agent, start_step:end_step, -3]
-                
                 # Check if the objective values have not changed over the threshold time steps
                 if np.all(past_obj_values == past_obj_values[0]) and agent != self.best_agent:
                     stuck_agents.append(agent)

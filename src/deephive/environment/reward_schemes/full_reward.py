@@ -1,5 +1,5 @@
 import numpy as np
-from environment.reward_schemes import RewardScheme
+from deephive.environment.reward_schemes import RewardScheme
 
 class FullRewardScheme(RewardScheme):
     def __init__(self, env, stuck_reward=-1, optimal_reward=10, frozen_best_reward=0):

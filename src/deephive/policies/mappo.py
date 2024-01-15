@@ -23,7 +23,7 @@ else:
     device = torch.device("cpu")
     print(f"Using device: {device}")
 
-from environment.utils import parse_config
+from deephive.environment.utils import parse_config
 random_seed = 47
 
 # Single Agent Memory Buffer

@@ -1,6 +1,6 @@
 import numpy as np
-from policies.mappo import MAPPO
-from environment.optimization_environment import OptimizationEnv
+from deephive.policies.mappo import MAPPO
+from deephive.environment.optimization_environment import OptimizationEnv
 from scipy.spatial.distance import cdist
 from matplotlib import pyplot as plt
 

@@ -18,3 +18,5 @@ wait
 
 # Then run the third script
 python experiments/compare.py --exp_list "$exp_num1,$exp_num2" --exp_numC $exp_numC
+
+

@@ -1,8 +1,8 @@
 import os
 import pandas as pd
-from policies.mappo import MAPPO
-from environment.optimization_environment import OptimizationEnv
-from environment.utils import parse_config
+from deephive.policies.mappo import MAPPO
+from deephive.environment.optimization_environment import OptimizationEnv
+from deephive.environment.utils import parse_config
 from datetime import datetime
 import numpy as np
 import seaborn as sns
@@ -14,7 +14,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import scipy
-from other_algorithms.pso import ParticleSwarmOptimizer
+from deephive.other_algorithms.pso import ParticleSwarmOptimizer
 import time
 
 def initialize(config_path, mode="train", **kwargs):

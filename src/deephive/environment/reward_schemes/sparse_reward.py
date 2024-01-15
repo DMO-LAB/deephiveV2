@@ -1,4 +1,4 @@
-from environment.reward_schemes import RewardScheme
+from deephive.environment.reward_schemes import RewardScheme
 import numpy as np
 
 class SparseRewardScheme(RewardScheme):

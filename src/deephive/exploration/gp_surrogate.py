@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 import matplotlib.pyplot as plt
-from environment.utils import filter_points
+from deephive.environment.utils import filter_points
 
 class GPSurrogateModule:
     def __init__(self, initial_samples, initial_values, kernel=None, **kwargs):
