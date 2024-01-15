@@ -75,7 +75,7 @@ class OptimizationEnv(gym.Env):
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
             self.mode = self.config["mode"] if "mode" in self.config else "exploration"
-            self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.1
+            self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.2
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -127,7 +127,7 @@ class OptimizationEnv(gym.Env):
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
         # self.surrogate_states_buffer = []
-        self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution)
+        self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim)
         # scale the grid points
         self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
 
@@ -145,8 +145,6 @@ class OptimizationEnv(gym.Env):
         else:
             observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
 
-        
-    
         return observation
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
