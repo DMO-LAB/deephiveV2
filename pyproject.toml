@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools", "wheel", "hatchling"]
+build-backend = "hatchling.build"
+[tool.hatch.metadata]
+allow-direct-references = true
+[tool.hatch.build.targets.wheel]
+packages = ["src/deephive"]
+
+[project]
+name = "deephive"
+version = "0.0.1"
+keywords = [
+  "Optimization",
+  "black-box optimization",
+  "evolutionary algorithms",
+  "reinforcement learning",
+]
+readme = "README.md"
+license = { text = "MIT License" }
+authors = [
+  { name = "Eloghosa Ikponmwoba", email = "eloghosaefficiency@gmail.com" },
+]
+
+[project.packages]
+include = ["environment", "environment.*", "exploration", "exploration.*", "policies", "policies.*", "other_algorithms", "other_algorithms.*"]
+
+project.dependencies = ["gymnasium==0.29.1",
+"numpy==1.22.2",
+"pandas==1.3.5",
+"scikit-learn==1.3.2",
+"scipy==1.8.0",
+"seaborn==0.11.2",
+"torch==1.10.0",
+"matplotlib==3.5.2",
+"python-dotenv==1.0.0",
+"neptune",
+"torch",
+"str2bool",]
