@@ -51,8 +51,8 @@ def print_items(**kwargs):
     for key, value in kwargs.items():
         print(key, value)
         
-def get_action(observation_info, agent_policy, env):
-    observation, observation_std = observation_info
+def get_action(observation_info, observation_std, agent_policy, env):
+    observation = observation_info
     actions = np.zeros((env.n_agents, env.n_dim))
     for dim in range(env.n_dim):
         observation[dim] = observation[dim].astype(np.float32)
@@ -61,15 +61,6 @@ def get_action(observation_info, agent_policy, env):
         actions[:, dim] = action
     return actions
 
-def get_action(observation_info, agent_policy, env):
-    observation, observation_std = observation_info
-    actions = np.zeros((env.n_agents, env.n_dim))
-    for dim in range(env.n_dim):
-        observation[dim] = observation[dim].astype(np.float32)
-        observation_std[dim] = observation_std[dim].astype(np.float32)
-        action = agent_policy.select_action(observation[dim], observation_std[dim])
-        actions[:, dim] = action
-    return actions
 
 def select_candidate_points(grid_points, evaluated_points, n_select):
     next_candidate_points = []

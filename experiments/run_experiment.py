@@ -10,7 +10,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_path="experiment/", save_interval=10,
-                   split_agents=True, threshold=0.1, save_surrogate_plots=False, sur_debug=False, number_of_points=6):
+                   split_agents=True, threshold=0.1, save_surrogate_plots=False, sur_debug=False, number_of_points=6, 
+                   decay_std=False):
     gbest_values = []
     if save_gif:
         os.makedirs(result_path, exist_ok=True)
@@ -20,21 +21,23 @@ def run_experiment(env, agent_policy, timesteps, iters, save_gif=False, result_p
         episode_gbVals = []
         gp_Info = []
         for i in range(timesteps):
+            if decay_std:
+                agent_policy.std_controller.decay_std()
+            agent_policy.std_controller.update_role(observation_info[1])
+            observation_std = agent_policy.std_controller.get_all_std()
             if sur_debug:
                 env.surrogate.plot_surrogate(save_dir=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_mean.png")
                 env.surrogate.plot_variance(save_dir=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_variance.png")
                 env.surrogate.plot_checkpoints_state(save_dir=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_checkpoints.png")
                 env.render(type="state", file_path=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_state_.png")
             episode_gbVals.append(env.gbest[-1])
-            exploiters_action =  get_action(observation_info, agent_policy, env)
+            exploiters_action =  get_action(observation_info[0], observation_std, agent_policy, env)
             explorer_action, next_point = get_informed_action(env, number_of_points=number_of_points)
             actions = np.zeros((env.n_agents, env.n_dim))
             actions[:(env.n_agents - number_of_points)] = exploiters_action[:(env.n_agents - number_of_points)]
             actions[(env.n_agents - number_of_points):] = explorer_action
             observation_info, reward, done, info = env.step(actions)
-            if split_agents == False and i == 4:
-                agent_policy.set_action_std(0.02)
-                print("Setting action std to 0.03")
+
             if sur_debug:
                 plot_point(env.grid_points, env.evaluated_points, next_point, save_dir=result_path + "iter_" + str(iter) + "_time_" + str(i) + "_points.png")
             if sur_debug:

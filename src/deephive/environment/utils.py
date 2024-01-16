@@ -57,6 +57,82 @@ class ScalingHelper:
         return rescaled_d
     
 
+
+# class StdController:
+#     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
+#         self.num_agents = num_agents
+#         self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
+#         self.role_std = role_std
+#         self.decay_rate = decay_rate
+#         self.min_std = min_std
+#         self.max_std = max_std
+#         self.iteration_num = 0
+
+#     def update_roles(self, roles):
+#         # roles: list of 0s and 1s indicating the role of each agent
+#         for dim in range(len(self.std)):
+#             self.std[dim] = [
+#                 self.role_std['exploiter'] if roles[agent_id] == 1 else self.role_std['explorer'] for agent_id in range(self.num_agents)
+#             ]
+            
+#     def decay_std(self, iteration):
+#         # Optionally decay std based on the iteration number
+#         decay_factor = self.decay_rate ** iteration
+#         self.std = [[max(self.min_std, min(s * decay_factor, self.max_std)) for s in self.std[dim]] for dim in range(len(self.std))]
+
+#     def get_std(self, agent_id):
+#         self.iteration_num += 1
+#         # Get the current std for a specific agent
+#         return self.std[agent_id]
+    
+#     def get_all_std(self, roles=None):
+#         # Get the current std for all agents
+#         if roles is not None:
+#             self.update_roles(roles)
+#         return self.std
+class StdController:
+    def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
+        self.num_agents = num_agents
+        self.n_dim = n_dim
+        self.role_std = role_std
+        self.decay_rate = decay_rate
+        self.min_std = min_std
+        self.max_std = max_std
+        self.iteration_num = 0
+        # Initialize std with explorer role for all dimensions and agents
+        self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
+        # Keep track of current roles
+        self.current_roles = [[0] * num_agents for _ in range(n_dim)]
+
+    def update_roles(self, roles):
+        # Update only the std of agents whose roles have changed in each dimension
+        for dim in range(self.n_dim):
+            for agent_id in range(self.num_agents):
+                if roles[dim][agent_id] != self.current_roles[dim][agent_id]:
+                    new_role = 'exploiter' if roles[dim][agent_id] == 1 else 'explorer'
+                    self.std[dim][agent_id] = self.role_std[new_role]
+            self.current_roles[dim] = roles[dim].copy()
+
+    def decay_std(self):
+        # Decay std based on the iteration number
+        decay_factor = self.decay_rate ** self.iteration_num
+        for dim in range(self.n_dim):
+            self.std[dim] = [max(self.min_std, min(s * decay_factor, self.max_std)) for s in self.std[dim]]
+        self.iteration_num += 1
+
+    def get_std(self, agent_id):
+        # Get the current std for a specific agent across all dimensions
+        return [self.std[dim][agent_id] for dim in range(self.n_dim)]
+
+    def get_all_std(self, roles=None):
+        # Get the current std for all agents across all dimensions
+        if roles is not None:
+            self.update_roles(roles)
+        return self.std
+
+
+    
+
 def parse_config(file_path: str) -> dict:
     """
     Parses a JSON configuration file and returns a dictionary.
@@ -226,9 +302,11 @@ class Render:
         state = self.env._get_actual_state()
         # use triangles to for the shape of the particles
         # plot scatter plot of the novel points with color red and the rest with color blue
-        novel_id = self.env.ids_true_function_eval
-        ax.scatter(state[novel_id, 0], state[novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="novel points", alpha=1)
-        ax.scatter(state[~novel_id, 0], state[~novel_id, 1], c="red", s=100, marker="^", edgecolors="black", label="non-novel points", alpha=1)
+        roles = self.env.state_history[:, self.env.current_step, -2]
+        exploiter_id = np.where(roles == 1)[0]
+        non_exploiter_id = np.isin(np.arange(len(state)), exploiter_id, invert=True)
+        ax.scatter(state[exploiter_id, 0], state[exploiter_id, 1], c="red", s=100, marker="*", edgecolors="black", label="Exploiter's points", alpha=1)
+        ax.scatter(state[non_exploiter_id, 0], state[non_exploiter_id, 1], c="green", s=100, marker="^", edgecolors="black", label="Explorer's points", alpha=1)
         
         if file_path is not None:
             plt.savefig(file_path)
@@ -358,7 +436,4 @@ def initialize_grid(bounds, resolution, n_dim):
 
     # Flatten and combine the grids to create a list of points
     points = np.vstack([grid.flatten() for grid in grids]).T
-
-    print(f"Number of grid points: {len(points)}")
-    print(points.shape)
     return points

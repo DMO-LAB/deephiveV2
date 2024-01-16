@@ -8,7 +8,6 @@ from deephive.environment.optimization_functions import OptimizationFunctionBase
 from deephive.environment.observation_schemes import ObservationScheme
 from deephive.environment.reward_schemes import RewardScheme
 from deephive.environment.utils import parse_config, ScalingHelper, Render, filter_points
-# from exploration.gaussian_mixture import ExplorationModule
 from deephive.environment.utils import initialize_grid
 from deephive.exploration.gp_surrogate import GPSurrogateModule
     
@@ -71,18 +70,16 @@ class OptimizationEnv(gym.Env):
             self.render_helper = Render(self)
             self.use_gbest = self.config["use_gbest"]
             self.use_optimal_value = self.config["use_optimal_value"]
-            self.enforce_good_actions = self.config["enforce_good_actions"]
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
-            self.mode = self.config["mode"] if "mode" in self.config else "exploration"
             self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.2
+            self.split_ratio = self.config["split_ratio"] if "split_ratio" in self.config else 0.5  
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
     def _reset_variables(self):
         self.state_history = np.zeros(
             (self.n_agents, self.ep_length+1, self.n_dim+3))
-        self.ids_true_function_eval_history = np.array([])
         self.gbest_history = np.zeros((self.ep_length+1, self.n_dim+1))
         self.best_obj_value = np.inf if self.optimization_type == "minimize" else -np.inf
         if self.use_optimal_value:
@@ -111,7 +108,6 @@ class OptimizationEnv(gym.Env):
             low=self.action_low, high=self.action_high, dtype=np.float64) 
         self.observation_space = spaces.Box(
             low=self.low, high=self.high, dtype=np.float64) 
-        self.num_of_function_evals = 0
 
     def __str__(self):
         return f"OptimizationEnv: {self.env_name} with {self.n_agents} agents in {self.n_dim} dimensions"
@@ -130,21 +126,16 @@ class OptimizationEnv(gym.Env):
         self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim)
         # scale the grid points
         self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
-
         actual_samples = self._get_actual_state()
         self.evaluated_points = self.state[:, :-1].copy() # scaled points
-        # self.surrogate_states_buffer.append(actual_samples)
-        self.ids_true_function_eval = np.arange(self.n_agents)
         if self.use_surrogate:
             #print("Instantiating the surrogate")
             self.surrogate = GPSurrogateModule(initial_samples=actual_samples[:, :-1], initial_values=actual_samples[:, -1], bounds=self.bounds) 
             _, self.agents_pos_std = self.surrogate.evaluate(actual_samples[:, :-1], scale=True)
             self.prev_agents_pos_std = self.agents_pos_std.copy()
-        if self.mode == "exploration":
-            observation = self.observation_schemes.generate_observation()
-        else:
-            observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
-
+        
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
+        self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
         return observation
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
@@ -156,13 +147,10 @@ class OptimizationEnv(gym.Env):
         self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
         if self.use_surrogate:
             _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
-        #print(self.prev_agents_pos_std)
         self.prev_obj_values = self.obj_values.copy()
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
         # Apply the action to the state
         self.state[:, :-1] += action
-        #print(f"action: {action}")
-
         # Handle freezing of the best agent 
         if self.freeze: 
             self.state[self.best_agent, :-1] -= action[self.best_agent] 
@@ -174,23 +162,12 @@ class OptimizationEnv(gym.Env):
         self.state = self._get_actual_state()
         if self.use_surrogate:
             _ , self.agents_pos_std = self.surrogate.evaluate(self.state[:, :-1], scale=True)
-            # if agents are too close to each other, select only one for training the surrogate
             surrogate_state = self.state.copy()
-            # explorer_agents = surrogate_state[self.n_agents//2:, :]
-            # exploiter_agents = surrogate_state[:self.n_agents//2, :]
-
-            # # add two more exploiter agents to the explorer agents and use the explorer agents for training the surrogate
-            # surrogate_state = explorer_agents #np.vstack((explorer_agents, exploiter_agents[:2, :])) 
+            # filter the points that are close to each other
             surrogate_state = filter_points(surrogate_state, min_distance=0.1)
-            # self.surrogate_states_buffer.append(surrogate_state)
-            #self.surrogate.update_model(self.state[:, :-1], self.state[:, -1])
             self.surrogate.update_model(surrogate_state[:, :-1], surrogate_state[:, -1])
 
-
         self.obj_values = self.objective_function.evaluate(params=self.state[:, :-1])
-        self.num_of_function_evals += self.n_agents
-        
-        # print(f"current step: {self.current_step}")
         self.current_step += 1
         self._update_env_state()
         self._update_pbest()
@@ -200,11 +177,8 @@ class OptimizationEnv(gym.Env):
         agents_done = np.array([self.done for _ in range(self.n_agents)])
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
-        if self.mode == "exploration":
-            observation = self.observation_schemes.generate_observation()
-        else:
-            observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest)
-            self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
+        self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
 
         info = self._get_info()
 
@@ -335,7 +309,6 @@ class OptimizationEnv(gym.Env):
                 low=self.low[0][:-1], high=self.high[0][:-1], size=(self.n_agents, self.n_dim)), decimals=2)
         # get the objective value of the initial position
         self.obj_values = self.objective_function.evaluate(params=init_pos)
-        self.num_of_function_evals += self.n_agents
         # combine the position and objective value
         init_obs = np.append(init_pos, self.obj_values.reshape(-1, 1), axis=1)
         return init_obs

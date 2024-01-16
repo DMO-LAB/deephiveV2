@@ -24,7 +24,7 @@ class GPSurrogateModule:
     
     def clear_gp(self, initial_samples, initial_values, kernel):
         # reset the gp
-        print("Resetting the GP")
+        #print("Resetting the GP")
         self.gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=20)
         self.gp.fit(initial_samples, initial_values)
 

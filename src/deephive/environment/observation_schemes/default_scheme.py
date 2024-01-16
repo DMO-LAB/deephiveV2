@@ -6,7 +6,7 @@ scaler = ScalingHelper()
 
 class DefaultObservationScheme(ObservationScheme):
     
-    def generate_observation(self, pbest, use_gbest=False, std_type="euclidean"):
+    def generate_observation(self, pbest, use_gbest=False, std_type="euclidean", ratio=0.5):
         pbest[:, :-1] = scaler.scale(pbest[:, :-1], self.env.min_pos, self.env.max_pos)
         pbest[:, -1] = scaler.scale(pbest[:, -1], self.env.worst_obj_value, self.env.best_obj_value)
         if self.env.optimization_type == "minimum":
@@ -30,15 +30,18 @@ class DefaultObservationScheme(ObservationScheme):
         obss = [np.array(agent_obs[i]).reshape(self.env.n_agents, obs_length) for i in range(self.env.n_dim)]
         std_obss = [np.array(std_obs[i]).reshape(self.env.n_agents, 1) for i in range(self.env.n_dim)]
 
-        return obss, self.assign_agent_roles(std_obss)
+        return obss, self.assign_agent_roles(std_obss, ratio)
 
 
-    def assign_agent_roles(self, std_obss):
+    def assign_agent_roles(self, std_obss, ratio):
         """
-        Assign roles to agents based on their distance to zero in each dimension.
-        
+        Assign roles to agents based on their distance to zero in each dimension, 
+        using a specified ratio to determine the split between roles.
+
         Args:
         std_obss (List[np.ndarray]): List of arrays, each containing distances of agents to zero in each dimension.
+        ratio (float): The ratio of agents to be assigned role 1 (exploiter). 
+                    Must be between 0 and 1, where 1 means all agents are role 1.
 
         Returns:
         List[np.ndarray]: List of binary arrays representing the roles of agents in each dimension.
@@ -56,14 +59,18 @@ class DefaultObservationScheme(ObservationScheme):
             # Sort agents by their distance and get their indices
             sorted_indices = np.argsort(std_obs)
             
-            # Assign roles: 1 for closer half, 0 for farther half
+            # Determine the split index based on the ratio
+            split_index = int(n_agents * ratio)
+            
+            # Assign roles: 1 for the closer ratio of agents, 0 for the rest
             roles = np.zeros(n_agents)
-            roles[sorted_indices[:n_agents // 2]] = 1
+            roles[sorted_indices[:split_index]] = 1
             
             # Append the roles for this dimension
             roles_per_dimension.append(roles)
 
         return roles_per_dimension
+
             
 
     def _get_agent_neighbors(self):
@@ -85,7 +92,7 @@ class DefaultObservationScheme(ObservationScheme):
             return abs(gbest - self.env.state[agent])
 
     def _get_obs_for_dim(self, agent, agent_nb, dim, pbest, gbest, use_gbest):
-        obs = [ #self.env.state[agent][dim],
+        obs = [ 
                 self.env.state[agent][self.env.n_dim],
                 (self.env.state[agent][dim] - self.env.prev_state[agent][dim]),
                 (self.env.state[agent][self.env.n_dim] - self.env.prev_state[agent][self.env.n_dim]),
@@ -97,10 +104,6 @@ class DefaultObservationScheme(ObservationScheme):
                 (self.env.state[agent][self.env.n_dim] - pbest[agent_nb][self.env.n_dim]),
         ]
         if use_gbest: 
-            # obs.extend([
-            #     self.env.state[agent][dim] - gbest[dim],
-            #     self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim],
-            # ])
             # replace the third and fourth elements with the distance to gbest
             obs[3] = self.env.state[agent][dim] - gbest[dim]
             obs[4] = self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim]

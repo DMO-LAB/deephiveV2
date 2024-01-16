@@ -1,9 +1,9 @@
 
 import os
 import pandas as pd
-from policies.mappo import MAPPO
-from environment.optimization_environment import OptimizationEnv
-from environment.utils import parse_config
+from deephive.policies.mappo import MAPPO
+from deephive.environment.optimization_environment import OptimizationEnv
+from deephive.environment.utils import parse_config
 from datetime import datetime
 import numpy as np
 import seaborn as sns
@@ -15,7 +15,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import scipy
-from other_algorithms.pso import ParticleSwarmOptimizer
+from deephive.other_algorithms.pso import ParticleSwarmOptimizer
 import time
 from dotenv import load_dotenv
 load_dotenv()
@@ -108,6 +108,7 @@ class OptimizationTrainer:
                         self.neptune_logger["train/percentage_high_std"].log(self.env.surrogate.percent_high_std)
                 timesteps += 1
             if timesteps % update_timestep == 0:
+                print(f"Updating policy at timestep {timesteps}")
                 self.agent_policy.update()
         
             if timesteps > 0 and episode % log_interval == 0:
@@ -132,6 +133,7 @@ class OptimizationTrainer:
                         self.neptune_logger[f"train/gifs/{episode}.gif"].upload(f"{save_path}{episode}.gif")
                     
             if timesteps % decay_interval == 0:
+                print(f"Decaying action std at timestep {timesteps}")
                 self.agent_policy.decay_action_std(decay_rate, min_action_std=min_action_std)
                 
             if timesteps % save_interval == 0 and timesteps > 0:
