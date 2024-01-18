@@ -101,6 +101,8 @@ class StdController:
         self.iteration_num = 0
         # Initialize std with explorer role for all dimensions and agents
         self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
+        # Track decayed std for each role
+        self.decayed_role_std = {role: std_val for role, std_val in role_std.items()}
         # Keep track of current roles
         self.current_roles = [[0] * num_agents for _ in range(n_dim)]
 
@@ -110,26 +112,41 @@ class StdController:
             for agent_id in range(self.num_agents):
                 if roles[dim][agent_id] != self.current_roles[dim][agent_id]:
                     new_role = 'exploiter' if roles[dim][agent_id] == 1 else 'explorer'
-                    self.std[dim][agent_id] = self.role_std[new_role]
+                    # Use decayed std for the new role
+                    self.std[dim][agent_id] = self.decayed_role_std[new_role]
             self.current_roles[dim] = roles[dim].copy()
 
     def decay_std(self):
         # Decay std based on the iteration number
         decay_factor = self.decay_rate ** self.iteration_num
+        for role in self.decayed_role_std:
+            self.decayed_role_std[role] = max(self.min_std, min(self.decayed_role_std[role] * decay_factor, self.max_std))
         for dim in range(self.n_dim):
-            self.std[dim] = [max(self.min_std, min(s * decay_factor, self.max_std)) for s in self.std[dim]]
+            for agent_id in range(self.num_agents):
+                role = 'exploiter' if self.current_roles[dim][agent_id] == 1 else 'explorer'
+                # Update std with decayed std for the current role
+                self.std[dim][agent_id] = max(self.min_std, min(self.std[dim][agent_id] * decay_factor, self.max_std))
         self.iteration_num += 1
-
+            
+    
     def get_std(self, agent_id):
         # Get the current std for a specific agent across all dimensions
         return [self.std[dim][agent_id] for dim in range(self.n_dim)]
 
-    def get_all_std(self, roles=None):
+    def get_all_std(self, roles=None, std=None):
         # Get the current std for all agents across all dimensions
+        if std is not None:
+            return np.array([[std] * self.num_agents for _ in range(self.n_dim)])
         if roles is not None:
             self.update_roles(roles)
-        return self.std
-
+        return np.array(self.std)
+    
+    def reset_std(self):
+        # Reset std for all agents to the initial std
+        self.std = [[self.role_std['explorer']] * self.num_agents for _ in range(self.n_dim)]
+        self.decayed_role_std = {role: std_val for role, std_val in self.role_std.items()}
+        self.current_roles = [[0] * self.num_agents for _ in range(self.n_dim)]
+        self.iteration_num = 0
 
     
 
@@ -164,7 +181,9 @@ def num_function_evaluation(
     opt_value: Optional[float] = None, 
     label: str = "TEST OPT", 
     num_function_evaluations: Optional[np.ndarray] = None,
-    plot_error_bounds: bool = False
+    plot_error_bounds: bool = False,
+    log_scale: bool = True,
+    title=None,
 ) -> None:
     """
     Plots and saves the number of function evaluations.
@@ -193,12 +212,63 @@ def num_function_evaluation(
     plt.legend(fontsize=14, frameon=False)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
-    plt.xscale('log')
+    if log_scale:
+        plt.xscale('log')
+    if title is not None:
+        plt.title(title)
+
+    with open(save_dir, 'wb') as f:
+        print("Saving plot to: ", save_dir)
+        plt.savefig(f)
+    plt.close()
+
+def plot_individual_function_evaluation(
+    fopt: np.ndarray,
+    n_agents: int,
+    save_dir: str,
+    opt_value: Optional[float] = None,
+    log_scale: bool = True,
+    title=None
+) -> None:
+    """
+    Plots and saves the number of function evaluations for each individual agent.
+
+    :param fopt: Array of function optimization results.
+    :param n_agents: Number of agents.
+    :param save_dir: Directory to save the plot.
+    :param opt_value: Optional known optimal value for comparison.
+    """
+    plt.figure(figsize=(6, 4), dpi=200)
+    fopt = np.array(fopt)
+    # plot each individual run in the same plot
+    for i in range(fopt.shape[0]):
+        plt.plot((np.arange(len(fopt[i])) + 1) * n_agents, fopt[i], linewidth=1.0, alpha=0.5)
+    
+    # plot the opt value if given
+    if opt_value is not None:
+        plt.axhline(opt_value, color='r', linestyle='--', label='Optimal Value')
+        
+    # plot the mean and std
+    mean = np.mean(fopt, axis=0)
+    std = np.std(fopt, axis=0)
+    
+    plt.plot((np.arange(len(mean)) + 1) * n_agents, mean, color='k', label='Mean')
+    plt.fill_between((np.arange(len(mean)) + 1) * n_agents, mean - std, mean + std, alpha=0.2, color='k', label='Std')
+    
+        
+    plt.xlabel('Number of Function Evaluations', fontsize=14)
+    plt.ylabel('Best Fitness Value', fontsize=14)
+    plt.legend(fontsize=14, frameon=False)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    if log_scale:
+        plt.xscale('log')
+    if title is not None:
+        plt.title(title)
 
     with open(save_dir, 'wb') as f:
         plt.savefig(f)
     plt.close()
-
 
 def plot_num_function_evaluation(
     fopt: List[np.ndarray], 
@@ -208,7 +278,9 @@ def plot_num_function_evaluation(
     show_std: bool = False, 
     symbol_list: Optional[List[str]] = None, 
     color_list: Optional[List[str]] = None, 
-    label_list: Optional[List[str]] = None
+    label_list: Optional[List[str]] = None,
+    log_scale: bool = True,
+    title=None
 ) -> None:
     """
     Plots the number of function evaluations for different algorithms.
@@ -221,6 +293,7 @@ def plot_num_function_evaluation(
     :param symbol_list: List of symbols for each plot line.
     :param color_list: List of colors for each plot line.
     :param label_list: List of labels for each plot line.
+    :param log_scale: Flag to use log scale for x-axis.
     """
     symbol_list = symbol_list if symbol_list is not None else ['-' for _ in range(len(fopt))]
     color_list = color_list if color_list is not None else ['#3F7F4C', '#CC4F1B', '#FFB852', '#64B5CD']
@@ -234,9 +307,9 @@ def plot_num_function_evaluation(
         mf1, ml1, mh1 = mean_confidence_interval(single_fopt, 0.95)
         x = (np.arange(len(mf1)) + 1) * n_agents
         if show_std:
-            plt.errorbar(x, mf1, yerr=mh1 - ml1, fmt=symbol_list[i], linewidth=2.0, label=label_list[i], color=color_list[i])
+            plt.errorbar(x, mf1, yerr=mh1 - ml1, fmt=symbol_list[i], linewidth=1.0, label=label_list[i], color=color_list[i])
         else:
-            plt.plot(x, mf1, symbol_list[i], linewidth=2.0, label=label_list[i], color=color_list[i])
+            plt.plot(x, mf1, symbol_list[i], linewidth=1.0, label=label_list[i], color=color_list[i])
 
     if opt_value is not None:
         plt.plot(x, np.full(len(mf1), opt_value), linewidth=1.0, label='True OPT', color='#CC4F1B')
@@ -244,8 +317,12 @@ def plot_num_function_evaluation(
     plt.xlabel('Number of Function Evaluations', fontsize=14)
     plt.ylabel('Best Fitness Value', fontsize=14)
     plt.legend(fontsize=8, frameon=False, loc="lower right")
-    plt.xscale('log')
+    if log_scale:
+        plt.xscale('log')
     plt.yticks(fontsize=14)
+    if title is not None:
+        plt.title(title, fontsize=14)
+
 
     with open(save_dir, 'wb') as f:
         plt.savefig(f)
@@ -303,10 +380,16 @@ class Render:
         # use triangles to for the shape of the particles
         # plot scatter plot of the novel points with color red and the rest with color blue
         roles = self.env.state_history[:, self.env.current_step, -2]
+        previous_state = self.env.state_history[:, self.env.current_step - 1, :-2]
         exploiter_id = np.where(roles == 1)[0]
         non_exploiter_id = np.isin(np.arange(len(state)), exploiter_id, invert=True)
         ax.scatter(state[exploiter_id, 0], state[exploiter_id, 1], c="red", s=100, marker="*", edgecolors="black", label="Exploiter's points", alpha=1)
         ax.scatter(state[non_exploiter_id, 0], state[non_exploiter_id, 1], c="green", s=100, marker="^", edgecolors="black", label="Explorer's points", alpha=1)
+        
+        # plot a line between the previous state and the current state
+        for i in range(len(state)):
+            ax.plot([previous_state[i, 0], state[i, 0]], [previous_state[i, 1], state[i, 1]], c="black", alpha=0.5)
+        ax.legend()
         
         if file_path is not None:
             plt.savefig(file_path)
@@ -358,16 +441,27 @@ class Render:
         scat = ax.scatter([], [], c="red", s=100, marker="^", edgecolors="black")
         # add a text box to display the iteration number
         text = ax.text(0.05, 0.95, "", transform=ax.transAxes)
+        self.previous_state_history = self.env.state_history[:, 0, :-2]
         
         def animate(i):
             scat.set_offsets(self.env.state_history[:, i, :-2])
             text.set_text(f"Iteration: {i}")
+            
+            # plot a line between the previous state and the current state
+            for j in range(len(self.env.state_history)):
+                ax.plot([self.previous_state_history[j, 0], self.env.state_history[j, i, 0]], [self.previous_state_history[j, 1], self.env.state_history[j, i, 1]], c="black", alpha=0.2)
+            self.previous_state_history = self.env.state_history[:, i, :-2]
+            # clear the line between the previous state and the current state
+            
+            
+            
             # use different colors for the particles based on their role - red for closer half, blue for farther half
             scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -2]])
     
             return scat,
-        
+        print("Creating animation")
         anim = animation.FuncAnimation(fig, animate, frames=self.env.state_history.shape[1], interval=1000/fps, blit=True)
+        print("Saving animation to: ", file_path)
         anim.save(file_path, writer="Pillow")
             
     
