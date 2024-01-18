@@ -60,6 +60,8 @@ class HeatExchangerFunction(OptimizationFunctionBase):
     def optimal_value(self, dim) -> float:
         return None
     
+    def __str__(self):
+        return "Heat Exchanger Function"
     
 class SphereFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -74,6 +76,9 @@ class SphereFunction(OptimizationFunctionBase):
     def optimal_value(self, dim) -> float:
         return 0 * dim
     
+    def __str__(self):
+        return "Sphere Function"
+    
 
 class CosineMixtureFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -87,6 +92,9 @@ class CosineMixtureFunction(OptimizationFunctionBase):
     
     def optimal_value(self, dim) -> float:
         return 0.1 * dim
+    
+    def __str__(self):
+        return "Cosine Mixture Function"
     
 class ShiftedCosineMixtureFunction:
     def __init__(self, shift: np.ndarray= None):
@@ -122,6 +130,9 @@ class ShiftedCosineMixtureFunction:
         shifted_params = params - self.shift
         return 0.1 * np.sum(np.cos(5 * np.pi * shifted_params), axis=1) - np.sum(shifted_params**2, axis=1)
 
+    def __str__(self):
+        return "Shifted Cosine Mixture Function"
+
     
 class AckleyFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -136,6 +147,8 @@ class AckleyFunction(OptimizationFunctionBase):
     def optimal_value(self, dim) -> float:
         return 0 * dim
     
+    def __str__(self):
+        return "Ackley Function"
 
 class RosenbrockFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -150,6 +163,9 @@ class RosenbrockFunction(OptimizationFunctionBase):
     def optimal_value(self, dim) -> float:
         return 0 * dim
     
+    def __str__(self):
+        return "Rosenbrock Function"
+    
 class GaussianPeakFunction(OptimizationFunctionBase):
     def __init__(self, mininize: bool = False):
         super().__init__(minimize=mininize)
@@ -163,3 +179,6 @@ class GaussianPeakFunction(OptimizationFunctionBase):
     
     def optimal_value(self, dim) -> float:
         return 4.808
+    
+    def __str__(self):
+        return "Gaussian Peak Function"
