@@ -13,7 +13,7 @@ from deephive.exploration.gp_surrogate import GPSurrogateModule
     
     
 class OptimizationEnv(gym.Env):
-    def __init__(self, config_path: str):
+    def __init__(self, config: Dict[str, Any]):
         """
         A class representing the optimization environment.
 
@@ -46,7 +46,7 @@ class OptimizationEnv(gym.Env):
         reward_schemes : function
             The reward scheme to use.
         """
-        self.config = parse_config(config_path)
+        self.config = config
         self.setup_config()
         
     def setup_config(self):
@@ -210,7 +210,7 @@ class OptimizationEnv(gym.Env):
             else:
                 raise ValueError("type should be either 'state' or 'history'")
         except Exception as e:
-            pass
+            raise e
             
         
     def _check_boundary_violations(self) -> np.ndarray:
