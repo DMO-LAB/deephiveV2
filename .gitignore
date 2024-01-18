@@ -14,5 +14,8 @@ Haresh_Experiment
 *.npy
 .png
 *.zip
-experiments/
+experiments/results/
+notebooks/experiments/results/
+
 *put*.txt
+
