@@ -111,10 +111,13 @@ class ActorCritic(nn.Module):
         if self.variable_std:
             action_var = self.get_std(std_obs) # type: ignore
             dist = tdist.Normal(action_mean, action_var)
+            action = dist.sample().diag()
         else:
             cov_mat = torch.diag(self.action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
-        action = dist.sample()
+            action = dist.sample()
+        
+        #print(f"action_mean: {action_mean}, action_var: {action_var}, action: {action}")
         action_logprob = dist.log_prob(action)
         return action.detach(), action_logprob.detach()
 
@@ -126,17 +129,18 @@ class ActorCritic(nn.Module):
         if self.variable_std:
             action_var = self.get_std(std_obs) # type: ignore
             dist = tdist.Normal(action_mean, action_var)
+            action_logprob = dist.log_prob(action).sum(dim=1)
         else:
             cov_mat = torch.diag(self.action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
-        action_logprob = dist.log_prob(action)
+            action_logprob = dist.log_prob(action)
         dist_entropy = dist.entropy()
 
         return action_logprob, torch.squeeze(state_value), dist_entropy
 
 
 class MAPPO:
-    def __init__(self, config_file, **kwargs):
+    def __init__(self, config, **kwargs):
         """
         Multi-Agent Proximal Policy Optimization Algorithm. 
         Args:
@@ -156,7 +160,6 @@ class MAPPO:
             ckpt_folder: Path to the folder containing the pretrained model.
             initialization: Type of initialization for the weights of the neural networks.
         """
-        config = parse_config(config_file)
         self.lr = config["lr"]
         self.kwargs = kwargs
         self.beta = config["beta"]
@@ -213,6 +216,7 @@ class MAPPO:
 
     def select_action(self, state, std_obs):
         state = torch.FloatTensor(state).to(device)  # Flatten the state
+        std_obs = torch.FloatTensor(std_obs).to(device)
         action, action_logprob = self.policy.act(state, std_obs)
         for i in range(self.n_agents):
             self.buffer.states.append(state[i])
