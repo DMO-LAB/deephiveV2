@@ -37,26 +37,45 @@ def filter_points(points, min_distance):
     return points[filtered_indices]
 
 
-def initialize(config_path, mode="train", **kwargs):
-    env = OptimizationEnv(config_path)
-    agent_policy = MAPPO(config_path)
+def initialize(config, mode="train", **kwargs):
+    env = OptimizationEnv(config)
+    agent_policy = MAPPO(config)
     if mode == "test" or mode == "benchmark":
         model_path = kwargs.get("model_path", None)
         if model_path is None:
             raise ValueError("Model path must be provided for testing")
-        agent_policy.load(model_path)
-    return env, agent_policy
+        # check if model path is a list of paths
+        if isinstance(model_path, list):
+            agent_policies = []
+            for path in model_path:
+                agent_policy = MAPPO(config)
+                agent_policy.load(path)
+                agent_policies.append(agent_policy)
+            return env, agent_policies
+        else:
+            agent_policy.load(model_path)
+            return env, agent_policy
+    
 
 def print_items(**kwargs):
     for key, value in kwargs.items():
         print(key, value)
         
-def get_action(observation_info, observation_std, agent_policy, env):
+        
+def get_action(observation_info, agent_policy, env, observation_std=None):
     observation = observation_info
+    # enforce observation_std to be a numpy array
+    if observation_std is None:
+        observation_std = np.zeros_like(observation)
+    else:
+        observation_std = np.array(observation_std)
     actions = np.zeros((env.n_agents, env.n_dim))
     for dim in range(env.n_dim):
-        observation[dim] = observation[dim].astype(np.float32)
-        observation_std[dim] = observation_std[dim].astype(np.float32)
+        observation[dim] = observation[dim]#.astype(np.float32)
+        if observation_std is not None:
+            observation_std[dim] = observation_std[dim]#.astype(np.float32) 
+        else:
+            observation_std[dim] = np.zeros_like(observation[dim])
         action = agent_policy.select_action(observation[dim], observation_std[dim])
         actions[:, dim] = action
     return actions
@@ -95,7 +114,6 @@ def get_informed_action(env, number_of_points=5):
     evaluated_points = env.evaluated_points
     # get the next candidate points
     evaluated_points, next_candidate_points = select_candidate_points(grid_points, evaluated_points, number_of_points)
-                                                                      
     # scale the next candidate points to the bounds of the environment
     #next_candidate_points = env.scaler_helper.scale(next_candidate_points, env.min_pos, env.max_pos)
     actions = next_candidate_points - env.state[(10-number_of_points):, :env.n_dim]
