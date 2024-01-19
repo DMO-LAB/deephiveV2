@@ -21,6 +21,8 @@ def cosine_mixture(params: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Function values.
     """
+    # reshape params to 2D array
+    # params = params.reshape(-1, 1)
     
     return 0.1 * np.sum(np.cos(5 * np.pi * params), axis=1) - np.sum(params**2, axis=1)
 
