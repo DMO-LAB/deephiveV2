@@ -72,7 +72,7 @@ class OptimizationEnv(gym.Env):
             self.use_optimal_value = self.config["use_optimal_value"]
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
-            self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.2
+            self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.1
             self.split_ratio = self.config["split_ratio"] if "split_ratio" in self.config else 0.5  
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
