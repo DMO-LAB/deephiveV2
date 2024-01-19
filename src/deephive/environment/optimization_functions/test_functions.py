@@ -3,6 +3,22 @@ import numpy as np
 from deephive.environment.commons.heat_exchanger import HeatExchanger, params
 from deephive.environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function, gaussian_peak
 from typing import Tuple, Callable, Dict, Any
+
+
+class Tracker():
+    """ A class to track the number of times a function is called. """
+    def __init__(self):
+        self.count = 0
+        self.function_values = []
+        
+    def __call__(self, z):
+        self.count += 1
+        self.function_values.append(z)
+    
+    def reset(self):
+        self.count = 0
+        self.function_values = []
+        
     
 class HeatExchangerFunction(OptimizationFunctionBase):
     def __init__(self):
@@ -46,13 +62,17 @@ class HeatExchangerFunction(OptimizationFunctionBase):
                 'ce': 0.00012 # cost of electricity per kWh
 
             } 
+        
+        self.tracker = Tracker()
     
     def _get_model(self) -> HeatExchanger:
         return HeatExchanger(params=self.params)
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         model = self._get_model()
-        return model.objective_function(params)
+        z = model.objective_function(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([0.015, 0.1, 0.05]), np.array([0.051, 1.5, 0.5])
@@ -65,10 +85,12 @@ class HeatExchangerFunction(OptimizationFunctionBase):
     
 class SphereFunction(OptimizationFunctionBase):
     def __init__(self):
-        pass
+        self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return sphere_function(params)
+        z = sphere_function(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
@@ -82,10 +104,12 @@ class SphereFunction(OptimizationFunctionBase):
 
 class CosineMixtureFunction(OptimizationFunctionBase):
     def __init__(self):
-        pass
+        self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return cosine_mixture(params)
+        z = cosine_mixture(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-1 for _ in range(dim)]), np.array([1 for _ in range(dim)])
@@ -103,10 +127,14 @@ class ShiftedCosineMixtureFunction:
             self.shift = np.round(np.random.uniform(-0.5, 0.5), 2)
         else:
             self.shift = shift
+            
+        self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
         params = params - self.shift
-        return self.cosine_mixture(params)
+        z = cosine_mixture(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         # Assuming the bounds should also be shifted
@@ -136,10 +164,12 @@ class ShiftedCosineMixtureFunction:
     
 class AckleyFunction(OptimizationFunctionBase):
     def __init__(self):
-        pass
+        self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return ackley_function(params)
+        z = ackley_function(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
@@ -152,10 +182,13 @@ class AckleyFunction(OptimizationFunctionBase):
 
 class RosenbrockFunction(OptimizationFunctionBase):
     def __init__(self):
-        pass
+        self.tracker = Tracker()
+        
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return rosenbrock_function(params)
+        z = rosenbrock_function(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-5 for _ in range(dim)]), np.array([5 for _ in range(dim)])
@@ -170,9 +203,12 @@ class GaussianPeakFunction(OptimizationFunctionBase):
     def __init__(self, mininize: bool = False):
         super().__init__(minimize=mininize)
         self.minimize = mininize
+        self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return gaussian_peak(params)
+        z = gaussian_peak(params)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-1 for _ in range(dim)]), np.array([1 for _ in range(dim)])
