@@ -15,6 +15,7 @@ Haresh_Experiment
 .png
 *.zip
 experiments/results/
+experiments/old_results/
 notebooks/experiments/results/
 
 *put*.txt
