@@ -11,8 +11,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # set figure size, dpi and fontsize
-plt.rcParams['figure.figsize'] = [7, 7]
-plt.rcParams['figure.dpi'] = 80
+plt.rcParams['figure.figsize'] = [10, 10]
+plt.rcParams['figure.dpi'] = 120
 plt.rcParams['font.size'] = 12
 
 class ScalingHelper:
@@ -215,7 +215,7 @@ def num_function_evaluation(
     if log_scale:
         plt.xscale('log')
     if title is not None:
-        plt.title(title)
+        plt.title(title, fontsize=10)
 
     with open(save_dir, 'wb') as f:
         print("Saving plot to: ", save_dir)
@@ -264,7 +264,7 @@ def plot_individual_function_evaluation(
     if log_scale:
         plt.xscale('log')
     if title is not None:
-        plt.title(title)
+        plt.title(title, fontsize=10)
 
     with open(save_dir, 'wb') as f:
         plt.savefig(f)
@@ -321,7 +321,7 @@ def plot_num_function_evaluation(
         plt.xscale('log')
     plt.yticks(fontsize=14)
     if title is not None:
-        plt.title(title, fontsize=14)
+        plt.title(title, fontsize=10)
 
 
     with open(save_dir, 'wb') as f:
