@@ -84,7 +84,8 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
             gbVal = [ga.generation_best_Y[i] * -1 for i in range(len(ga.generation_best_Y))]
             gbestVals.append(gbVal)
         elif isinstance(algorithm, PSO):
-            algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound)
+            algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
+                            w = config['w'], c1 = config['c1'], c2 = config['c2'])
             pso = algorithm
             _ = pso.run()
             gbVal = [pso.gbest_y_hist[i][0] * -1 for i in range(len(pso.gbest_y_hist))]
@@ -101,9 +102,9 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
     np.save(result_path + "gbestVals.npy", gb)
         
     if config['plot_gbest']:
-            num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
+            num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "pso_num_function_evaluations.png", opt_value=opt_value,
                                     log_scale=False, plot_error_bounds=True, title=title)
-            plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
+            plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "pso_num_function_evaluations2.png", opt_value=opt_value,
                                     log_scale=False, title=title)
             
     run_summary = {
@@ -121,7 +122,7 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
 def run_experiment(env, agent_policy, config, exp_name, save_gif=True, title=""):
     result_path = 'experiments/results/' + exp_name + '/'
     os.makedirs(result_path, exist_ok=True)
-    
+    animated_iters = []
     if isinstance(agent_policy, list):
         assert config['split_agents'] == True, "split_agents must be True in config"
         assert config['split_type'] == "use_two_policies", "split_type must be use_two_policies in config"
@@ -148,8 +149,14 @@ def run_experiment(env, agent_policy, config, exp_name, save_gif=True, title="")
             obs, roles = observation_info
             
             episode_gbest.append(env.gbest[-1])
-
-        if env.gbest[-1] < config['tol'] * opt_value:
+        if config['tol'] != 0:
+            tol = config['tol'] * opt_value
+        elif config['tol'] == 0:
+            tol = -0.01
+        else:
+            raise ValueError("tol must be positive")
+        if env.gbest[-1] < tol:
+            animated_iters.append(iter)
             print(f"[WARNING - iter {iter}] - Optimization failed to get to {config['tol']}% of optimal value - {opt_value}")
             print(f"Best value found: {env.gbest[-1]}")
             print("Rendering the episode history ...")
@@ -157,7 +164,7 @@ def run_experiment(env, agent_policy, config, exp_name, save_gif=True, title="")
             if env.n_dim <=2:
                 env.render(type="history", file_path=result_path + "error_history_" + str(iter) + "_.gif")
         if save_gif and env.n_dim <=2:
-            if iter % 10 == 0:
+            if iter % 10 == 0 and iter not in animated_iters:
                 env.render(type="history", file_path=result_path + "history_" + str(iter) + "_.gif")
         gbestVals.append(episode_gbest)
         
@@ -213,6 +220,9 @@ if __name__ == "__main__":
     parser.add_argument('--tol', type=float, default=.99)
     parser.add_argument('--exploit_std', type=float, default=0.02)
     parser.add_argument('--policy_type', type=str, default="pbest", choices=["pbest", "gbest"])
+    parser.add_argument('--pso_w', type=float, default=0.8)
+    parser.add_argument('--pso_c1', type=float, default=2)
+    parser.add_argument('--pso_c2', type=float, default=2)
     
 
 
@@ -238,6 +248,9 @@ if __name__ == "__main__":
     config['iters'] = args.iters
     config['tol'] = args.tol
     config['exploit_std'] = args.exploit_std
+    config['w'] = args.pso_w
+    config['c1'] = args.pso_c1
+    config['c2'] = args.pso_c2
     mode = "test"
 
     exp_name = "exp_" + str(args.exp_num)
@@ -280,7 +293,8 @@ if __name__ == "__main__":
         algorithm = GA(func=objective_function, n_dim=env.n_dim, size_pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound, precision=[1e-7 for _ in range(env.n_dim)])
         run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
     elif args.algo == "PSO":
-        algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound)
+        algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
+                        w = config['w'], c1 = config['c1'], c2 = config['c2'])
         run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
     elif args.algo == "SA":
         algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])

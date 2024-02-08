@@ -3,6 +3,10 @@ import numpy as np
 from deephive.environment.commons.heat_exchanger import HeatExchanger, params
 from deephive.environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function, gaussian_peak
 from typing import Tuple, Callable, Dict, Any
+import sys 
+from deephive.environment.optimization_functions.cec2017 import functions
+
+all_functions = functions.all_functions
 
 
 class Tracker():
@@ -21,7 +25,7 @@ class Tracker():
         
     
 class HeatExchangerFunction(OptimizationFunctionBase):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.params = {
                 'tube': {
                     'mt': 68.90,  # mass flow rate of tube side fluid (kg/s)
@@ -84,7 +88,7 @@ class HeatExchangerFunction(OptimizationFunctionBase):
         return "Heat Exchanger Function"
     
 class SphereFunction(OptimizationFunctionBase):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
@@ -103,7 +107,7 @@ class SphereFunction(OptimizationFunctionBase):
     
 
 class CosineMixtureFunction(OptimizationFunctionBase):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
@@ -121,7 +125,7 @@ class CosineMixtureFunction(OptimizationFunctionBase):
         return "Cosine Mixture Function"
     
 class ShiftedCosineMixtureFunction:
-    def __init__(self, shift: np.ndarray= None):
+    def __init__(self, shift: np.ndarray= None, **kwargs):
         if shift is None:
             # set random shift
             self.shift = np.round(np.random.uniform(-0.5, 0.5), 2)
@@ -163,7 +167,7 @@ class ShiftedCosineMixtureFunction:
 
     
 class AckleyFunction(OptimizationFunctionBase):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
@@ -181,7 +185,7 @@ class AckleyFunction(OptimizationFunctionBase):
         return "Ackley Function"
 
 class RosenbrockFunction(OptimizationFunctionBase):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.tracker = Tracker()
         
 
@@ -200,7 +204,7 @@ class RosenbrockFunction(OptimizationFunctionBase):
         return "Rosenbrock Function"
     
 class GaussianPeakFunction(OptimizationFunctionBase):
-    def __init__(self, mininize: bool = False):
+    def __init__(self, mininize: bool = False, **kwargs):
         super().__init__(minimize=mininize)
         self.minimize = mininize
         self.tracker = Tracker()
@@ -218,3 +222,22 @@ class GaussianPeakFunction(OptimizationFunctionBase):
     
     def __str__(self):
         return "Gaussian Peak Function"
+    
+    
+class CEC17(OptimizationFunctionBase):
+    def __init__(self, function_id: int, negative: bool = True, **kwargs):
+        self.tracker = Tracker()
+        self.function_id = function_id
+        self.negative = negative
+
+    def evaluate(self, params: np.ndarray) -> np.ndarray:
+        return all_functions[self.function_id](params, negative=self.negative)
+
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
+    
+    def optimal_value(self, dim) -> float:
+        return None
+    
+    def __str__(self):
+        return f"CEC17 Function {self.function_id}"

@@ -53,7 +53,7 @@ class OptimizationEnv(gym.Env):
         # Configuration code from the original __init__ method
         try:
             self.env_name = self.config["env_name"]
-            self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "deephive.environment.optimization_functions"), self.config["objective_function"])()
+            self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "deephive.environment.optimization_functions"), self.config["objective_function"])(function_id=self.config["function_id"], negative=self.config["negative"])
             self.n_agents = self.config["n_agents"]
             self.n_dim = self.config["n_dim"]
             self.bounds:Tuple[np.ndarray] = self.objective_function.bounds(self.n_dim)
@@ -123,9 +123,10 @@ class OptimizationEnv(gym.Env):
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
         # self.surrogate_states_buffer = []
-        self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim)
-        # scale the grid points
-        self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
+        if self.config["use_grid"]:
+            self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim) 
+            # scale the grid points
+            self.grid_points = self.scaler_helper.scale(self.grid_points, self.min_pos, self.max_pos)
         actual_samples = self._get_actual_state()
         self.evaluated_points = self.state[:, :-1].copy() # scaled points
         if self.use_surrogate:
@@ -405,8 +406,8 @@ class OptimizationEnv(gym.Env):
                 if np.all(past_obj_values == past_obj_values[0]) and agent != self.best_agent:
                     stuck_agents.append(agent)
         
-        if len(stuck_agents) > 1:
-            print(f"{len(stuck_agents)} agents are stuck - {stuck_agents} at step {self.current_step}")
+        # if len(stuck_agents) > 1:
+        #     print(f"{len(stuck_agents)} agents are stuck - {stuck_agents} at step {self.current_step}")
         return stuck_agents
 
 

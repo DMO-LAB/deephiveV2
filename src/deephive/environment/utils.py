@@ -184,6 +184,7 @@ def num_function_evaluation(
     plot_error_bounds: bool = False,
     log_scale: bool = True,
     title=None,
+    minimize: bool = False
 ) -> None:
     """
     Plots and saves the number of function evaluations.
@@ -209,7 +210,10 @@ def num_function_evaluation(
 
     plt.xlabel('Number of Function Evaluations', fontsize=14)
     plt.ylabel('Best Fitness Value', fontsize=14)
-    plt.legend(fontsize=14, frameon=False)
+    if not minimize:
+        plt.legend(fontsize=8, frameon=False, loc="lower right")
+    else:
+        plt.legend(fontsize=14, frameon=False, loc="upper right")
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     if log_scale:
@@ -280,7 +284,8 @@ def plot_num_function_evaluation(
     color_list: Optional[List[str]] = None, 
     label_list: Optional[List[str]] = None,
     log_scale: bool = True,
-    title=None
+    title=None,
+    minimize: bool = False
 ) -> None:
     """
     Plots the number of function evaluations for different algorithms.
@@ -316,7 +321,10 @@ def plot_num_function_evaluation(
 
     plt.xlabel('Number of Function Evaluations', fontsize=14)
     plt.ylabel('Best Fitness Value', fontsize=14)
-    plt.legend(fontsize=8, frameon=False, loc="lower right")
+    if not minimize:
+        plt.legend(fontsize=8, frameon=False, loc="lower right")
+    else:
+        plt.legend(fontsize=8, frameon=False, loc="upper right")
     if log_scale:
         plt.xscale('log')
     plt.yticks(fontsize=14)

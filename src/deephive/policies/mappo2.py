@@ -1,3 +1,5 @@
+# The above code defines the MAPPO (Multi-Agent Proximal Policy Optimization) algorithm for training
+# an actor-critic model in a multi-agent environment.
 import numpy as np
 import torch
 import torch.distributions as tdist
@@ -5,6 +7,10 @@ import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 from typing import List, Tuple, Optional
 from torch import nn
+import warnings
+from deephive.environment.utils import StdController
+warnings.filterwarnings('ignore')
+
 # set device for mps
 # if not torch.backends.mps.is_available():
 #     if not torch.backends.mps.is_built():
@@ -12,16 +18,15 @@ from torch import nn
 #               "built with MPS enabled.")
 # else:
     # use cuda if available
+
 if torch.cuda.is_available():
     device = torch.device("cuda")
     print(f"Using device: {device}")
 else:
     device = torch.device("cpu")
     print(f"Using device: {device}")
-    
 
-
-from environment.utils import parse_config
+from deephive.environment.utils import parse_config
 random_seed = 47
 
 # Single Agent Memory Buffer
@@ -45,10 +50,12 @@ class Memory:
         del self.logprobs[:]
         del self.std_obs[:]
 
+    #
 
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim: int, action_dim: int,  layer_size: List, 
-                action_std_init : float = 0.2, std_min : float = 0.001, std_max: float = 0.2, std_type : str ='linear', learn_std: bool = True, ):
+                action_std_init : float = 0.2, variable_std: bool = True, std_obs_dim: int = 0, 
+                use_std_model: bool = False, std_model_layers: List = [8, 8]):
         super(ActorCritic, self).__init__()
         """ 
         Actor Critic Network for the agent.
@@ -57,11 +64,12 @@ class ActorCritic(nn.Module):
             action_dim: Dimension of the action vector.
             layer_size: List of layer sizes for the actor and critic networks.
             action_std_init: Initial standard deviation for the action distribution.
-            std_min: Minimum value for the standard deviation.
-            std_max: Maximum value for the standard deviation.
-            std_type: Type of decay for the standard deviation.
-            learn_std: Whether the standard deviation should be learned or not.    
+            variable_std: Whether the standard deviation should be fixed or variable.  
         """
+        if std_obs_dim == 0:
+            std_obs_dim = obs_dim
+            
+        self.use_std_model = use_std_model
 
         self.actor = nn.Sequential(
             nn.Linear(obs_dim, layer_size[0]),
@@ -78,25 +86,65 @@ class ActorCritic(nn.Module):
             nn.Tanh(),
             nn.Linear(layer_size[1], 1),
         )
+        
+        self.std_actor = nn.Sequential(
+            nn.Linear(std_obs_dim, std_model_layers[0]),
+            nn.Tanh(),
+            nn.Linear(std_model_layers[0], std_model_layers[1]),
+            nn.Tanh(),
+            nn.Linear(std_model_layers[1], action_dim),
+            nn.Sigmoid(),
+        )
 
         self.action_dim = action_dim
-        self.std_min = std_min
-        self.learn_std = learn_std
-        self.std_max = std_max
-        self.std_type = std_type
-        self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)   #action_std is a constant
+        self.variable_std = variable_std
+        # self.action_var = torch.full((action_dim,), action_std_init *
+        #                              action_std_init).to(device) 
+        self.init_action_std = action_std_init
+        self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)
+        self.action_var = action_std_init if self.variable_std else self.action_var
+        self.mean_predicted_action_std = action_std_init
+        self.reset_min_std()
 
-        if self.learn_std:
-            assert self.action_dim > 1, "learn_std is set to True, but action_dim is not > 1"
-
-    def set_action_std(self, new_action_std : float):
+    def reset_min_std(self):
+        self.min_action_std = torch.ones(self.action_dim)
+        self.mean_min_action_std = torch.mean(self.min_action_std)
+        #print(f"resetting min_action_std) to {self.mean_min_action_std} from {self.mean_predicted_action_std}")
+    
+    def set_action_std(self, new_action_std: float):
+                # self.action_var = torch.full(
+                #     (self.action_dim,), new_action_std * new_action_std).to(device)
+            if self.variable_std:
+                self.action_var = new_action_std
+            else:
                 self.action_var = torch.full(
                     (self.action_dim,), new_action_std * new_action_std).to(device)
-    
+            
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state: torch.Tensor, std_obs: Optional[np.ndarray] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_std(self, std_obs: np.ndarray, evaluation=False) -> torch.Tensor:
+        # convert the std_obs to variance and then return the tensor
+        if self.use_std_model:
+            # convert the std_obs to variance and then return the tensor
+            std_obs = torch.FloatTensor(std_obs).to(device)
+            action_std = torch.abs(self.std_actor(std_obs))
+            self.mean_predicted_action_std = torch.mean(action_std)
+            if not evaluation:
+                self.min_action_std = torch.min(self.min_action_std, action_std)
+                self.mean_min_action_std = torch.mean(self.min_action_std)
+                action_vars = self.min_action_std * self.action_var 
+                self.applied_action_vars = action_vars
+                self.mean_applied_action_vars = torch.mean(action_vars)
+            else:   
+                action_vars = action_std * self.action_var
+        else:
+            action_vars = std_obs.pow(2)
+        return action_vars
+
+
+    def act(self, state: torch.Tensor, std_obs: Optional[np.ndarray] = None,
+            debug=False) -> Tuple[torch.Tensor, torch.Tensor]:
         """ 
         Function to sample actions from the policy given the state.
         Args:
@@ -106,49 +154,54 @@ class ActorCritic(nn.Module):
             action: Action sampled from the policy.
             action_logprob: Log probability of the action sampled from the policy.
         """
-        if not self.learn_std:
-            action_mean = self.actor(state)
+        action_mean = self.actor(state)  
+        if debug:
+            print(f"action_mean: {action_mean}")
+        if self.variable_std:
+            action_var = self.get_std(std_obs) # type: ignore
+            if debug:
+                print(f"action_var: {action_var}")
+            dist = tdist.Normal(action_mean, action_var)
+            action = dist.sample()
+            if debug:
+                print(f"action: {action}")
+        else:
             cov_mat = torch.diag(self.action_var).to(device)
             dist = MultivariateNormal(action_mean, cov_mat)
             action = dist.sample()
-            action_logprob = dist.log_prob(action)
-            return action.detach(), action_logprob.detach()
-        else:
-            action = self.actor(state)
-            # action comprise of action_mean and action_logstd, now we split them using torch.split
-            action_mean, action_logstd = action[:, 0], action[:, 1]
-            # use the action_logstd to calculate the action_std
-            action_std = action_logstd
-            dist = tdist.Normal(action_mean, action_std)
-            action = dist.sample()
-            action_logprob = dist.log_prob(action)
-            return action.detach(), action_logprob.detach()
-    
+            if debug:
+                print(f"action: {action}")
+        
+        #print(f"action_mean: {action_mean}, action_var: {action_var}, action: {action}")
+        action_logprob = dist.log_prob(action)
+        return action.detach(), action_logprob.detach()
 
     def evaluate(self, state: torch.Tensor, action: torch.Tensor, std_obs: Optional[np.ndarray] = None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         state_value = self.critic(state)
-        # For Single Action Environments.
         if self.action_dim == 1:
             action = action.reshape(-1, self.action_dim)
+        
         action_mean = self.actor(state)
-        if self.learn_std:
-            action_info = self.actor(state)
-            # action comprise of action_mean and action_logstd, now we split them using torch.split
-            action, action_logstd = action_info[:, 0], action_info[:, 1]
-            # action_mean, action_logstd = self.actor(state)
-            action_std = action_logstd
-            dist = tdist.Normal(action, action_std)
+        # check if action_mean is nan, then print the state
+        if torch.isnan(action_mean).any():
+            print(f"action_mean is nan, state: {state}")
+        #print(f"action_mean: {action_mean}")
+        if self.variable_std:
+            action_var = self.get_std(std_obs,evaluation=True) # type: ignore
+            dist = tdist.Normal(action_mean, action_var)
+            action_logprob = dist.log_prob(action).sum(dim=1)
         else:
             cov_mat = torch.diag(self.action_var).to(device)
+            #print(f"cov_mat: {cov_mat}")
             dist = MultivariateNormal(action_mean, cov_mat)
-        action_logprob = dist.log_prob(action)
+            action_logprob = dist.log_prob(action)
         dist_entropy = dist.entropy()
 
         return action_logprob, torch.squeeze(state_value), dist_entropy
 
 
 class MAPPO:
-    def __init__(self, config_file, **kwargs):
+    def __init__(self, config, **kwargs):
         """
         Multi-Agent Proximal Policy Optimization Algorithm. 
         Args:
@@ -157,10 +210,7 @@ class MAPPO:
             state_dim: Dimension of the state vector.
             action_dim: Dimension of the action vector.
             action_std: Initial standard deviation for the action distribution.
-            std_min: Minimum value for the standard deviation.
-            std_max: Maximum value for the standard deviation.
-            std_type: Type of decay for the standard deviation.
-            learn_std: Whether the standard deviation should be learned or not.
+            variable_std: Whether the standard deviation should be fixed or variable.
             layer_size: Size of the hidden layers.
             lr: Learning rate.
             beta: Beta parameter for the Adam optimizer.
@@ -171,7 +221,6 @@ class MAPPO:
             ckpt_folder: Path to the folder containing the pretrained model.
             initialization: Type of initialization for the weights of the neural networks.
         """
-        config = parse_config(config_file)
         self.lr = config["lr"]
         self.kwargs = kwargs
         self.beta = config["beta"]
@@ -183,15 +232,21 @@ class MAPPO:
         self.action_std = config["action_std"]
         self.obs_dim = config["obs_dim"]
         self.action_dim = config["action_dim"]
-        self.action_std = config["action_std"]
         self.layer_size = config["layer_size"]
-        self.std_min = config["std_min"]
-        self.std_max = config["std_max"]
-        self.std_type = config["std_type"]
-        self.learn_std = config["learn_std"]
+        self.variable_std = config["variable_std"] if "variable_std" in config else False
         self.pretrained = config["pretrained"]
         self.ckpt_folder = config["ckpt_folder"]
+        self.std_obs_dim = config["std_obs_dim"]
+        self.use_std_model = config["use_std_model"]
+        self.std_model_layers = config["std_model_layers"]
         self.initialization = None
+        
+        self.std_controller = StdController(num_agents=self.n_agents,
+                                            n_dim=self.n_dim,
+                                            role_std=config["role_std"],
+                                            decay_rate=config["decay_rate"],
+                                            min_std=config["std_min"],
+                                            max_std=config["std_max"])
         
         self.device = device
         self.buffer = Memory()
@@ -200,11 +255,10 @@ class MAPPO:
             if type(m) == nn.Linear:
                 torch.nn.init.xavier_uniform_(m.weight)
         
-        self.policy = ActorCritic(self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size, std_min=self.std_min,
-                                std_max=self.std_max, std_type=self.std_type, learn_std=self.learn_std).to(self.device)
+        self.policy = ActorCritic(self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size,
+                                 variable_std=self.variable_std, std_obs_dim=self.std_obs_dim, use_std_model=self.use_std_model,
+                                    std_model_layers=self.std_model_layers).to(device)
         
-        # if self.initialization is not None:
-        #     self.policy.apply(init_weights)
         if self.pretrained:
             pretrained_model = torch.load(
                 self.ckpt_folder, map_location=lambda storage, loc: storage)
@@ -214,8 +268,9 @@ class MAPPO:
 
         # old policy
         self.old_policy = ActorCritic(
-            self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size, std_min=self.std_min,
-            std_max=self.std_max, std_type=self.std_type, learn_std=self.learn_std).to(device)
+            self.obs_dim, self.action_dim, action_std_init=self.action_std, layer_size=self.layer_size,
+            variable_std=self.variable_std, std_obs_dim=self.std_obs_dim, use_std_model=self.use_std_model,
+            std_model_layers=self.std_model_layers).to(device)
         
         self.old_policy.load_state_dict(self.policy.state_dict())
 
@@ -225,9 +280,10 @@ class MAPPO:
     def __str__(self):
              return f"MAPPO: {self.n_agents} agents, {self.n_dim} dimensions, {self.action_std} action std, {self.lr} lr, {self.beta} beta, {self.gamma} gamma, {self.K_epochs} epochs, {self.eps_clip} eps_clip"
 
-    def select_action(self, state, std_obs):
+    def select_action(self, state, std_obs, debug=False):
         state = torch.FloatTensor(state).to(device)  # Flatten the state
-        action, action_logprob = self.policy.act(state, std_obs)
+        std_obs = torch.FloatTensor(std_obs).to(device)
+        action, action_logprob = self.policy.act(state, std_obs, debug=debug)
         for i in range(self.n_agents):
             self.buffer.states.append(state[i])
             self.buffer.std_obs.append(std_obs[i])
@@ -240,17 +296,22 @@ class MAPPO:
         self.policy.set_action_std(new_action_std)
         self.old_policy.set_action_std(new_action_std)
         
-    def decay_action_std(self, action_std_decay_rate, min_action_std=0.001, learn_std=False):
-        if learn_std:
-            print(f"not decaying action std because learn_std is set to {learn_std}")
+    def decay_action_std(self, action_std_decay_rate, min_action_std=0.001, variable_std=False, debug=False):
+        if variable_std:
+            print(f"not decaying action std because variable_std is set to {variable_std}")
             pass
         else:
-            self.action_std = self.action_std - action_std_decay_rate
+            self.action_std = self.action_std * action_std_decay_rate
             self.action_std = round(self.action_std, 4)
             if (self.action_std <= min_action_std):
+                if debug:
+                    print(f"[INFO]: setting action std factor to min_action_std {min_action_std}")
                 self.action_std = min_action_std
             else:
-                print(f"setting action std to {self.action_std}")
+                if debug:
+                    print(f"[INFO]: setting action std factor to {self.action_std}")
+                else:
+                    pass
             self.set_action_std(self.action_std)
         
     def __get_buffer_info(self, buffer):
@@ -308,9 +369,9 @@ class MAPPO:
             self.buffer)
         loss = self._update_old_policy(self.policy, self.old_policy, self.optimizer,
                                     rewards, old_states, old_actions, old_logprobs, old_std_obs)
+        #print(f"loss: {loss}")
         if loss is not None:
             self.buffer.clear_memory()
-            #print(f'[INFO]: policy updated with loss {loss} and buffer cleared')
             assert len(self.buffer.states) == 0
         else:
             print(f'[ERROR]: policy update failed')
@@ -321,5 +382,5 @@ class MAPPO:
         print("Saved policy to: ", filename)
     
     def load(self, filename):
-        self.policy.load_state_dict(torch.load(filename))
+        self.policy.load_state_dict(torch.load(filename, map_location=lambda storage, loc: storage))
         print("Loaded policy from: ", filename)

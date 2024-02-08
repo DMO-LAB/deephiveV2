@@ -312,3 +312,8 @@ class ExplorationModule:
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
         plt.show()
+        
+        
+        
+        
+        

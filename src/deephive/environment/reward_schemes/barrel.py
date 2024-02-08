@@ -2,3 +2,4 @@ from deephive.environment.reward_schemes.full_reward import FullRewardScheme
 from deephive.environment.reward_schemes.sparse_reward import SparseRewardScheme
 from deephive.environment.reward_schemes.custom_reward import CustomRewardScheme
 from deephive.environment.reward_schemes.explorers_reward import ExplorersRewardScheme
+from deephive.environment.reward_schemes.full_reward2 import FullRewardScheme2

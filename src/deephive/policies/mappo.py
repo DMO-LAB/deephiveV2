@@ -1,3 +1,5 @@
+# The above code defines the MAPPO (Multi-Agent Proximal Policy Optimization) algorithm for training
+# an actor-critic model in a multi-agent environment.
 import numpy as np
 import torch
 import torch.distributions as tdist
@@ -125,13 +127,19 @@ class ActorCritic(nn.Module):
         state_value = self.critic(state)
         if self.action_dim == 1:
             action = action.reshape(-1, self.action_dim)
+        
         action_mean = self.actor(state)
+        # check if action_mean is nan, then print the state
+        if torch.isnan(action_mean).any():
+            print(f"action_mean is nan, state: {state}")
+        #print(f"action_mean: {action_mean}")
         if self.variable_std:
             action_var = self.get_std(std_obs) # type: ignore
             dist = tdist.Normal(action_mean, action_var)
             action_logprob = dist.log_prob(action).sum(dim=1)
         else:
             cov_mat = torch.diag(self.action_var).to(device)
+            #print(f"cov_mat: {cov_mat}")
             dist = MultivariateNormal(action_mean, cov_mat)
             action_logprob = dist.log_prob(action)
         dist_entropy = dist.entropy()
@@ -230,7 +238,7 @@ class MAPPO:
         self.policy.set_action_std(new_action_std)
         self.old_policy.set_action_std(new_action_std)
         
-    def decay_action_std(self, action_std_decay_rate, min_action_std=0.001, variable_std=False):
+    def decay_action_std(self, action_std_decay_rate, min_action_std=0.001, variable_std=False, debug=False):
         if variable_std:
             print(f"not decaying action std because variable_std is set to {variable_std}")
             pass
@@ -238,10 +246,14 @@ class MAPPO:
             self.action_std = self.action_std * action_std_decay_rate
             self.action_std = round(self.action_std, 4)
             if (self.action_std <= min_action_std):
-                print(f"setting action std to min_action_std {min_action_std}")
+                if debug:
+                    print(f"[INFO]: setting action std to min_action_std {min_action_std}")
                 self.action_std = min_action_std
             else:
-                print(f"setting action std to {self.action_std}")
+                if debug:
+                    print(f"[INFO]: setting action std to {self.action_std}")
+                else:
+                    pass
             self.set_action_std(self.action_std)
         
     def __get_buffer_info(self, buffer):
@@ -299,6 +311,7 @@ class MAPPO:
             self.buffer)
         loss = self._update_old_policy(self.policy, self.old_policy, self.optimizer,
                                     rewards, old_states, old_actions, old_logprobs, old_std_obs)
+        #print(f"loss: {loss}")
         if loss is not None:
             self.buffer.clear_memory()
             assert len(self.buffer.states) == 0

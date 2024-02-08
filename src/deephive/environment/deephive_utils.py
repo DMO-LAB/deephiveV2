@@ -55,6 +55,8 @@ def initialize(config, mode="train", **kwargs):
         else:
             agent_policy.load(model_path)
             return env, agent_policy
+    else:
+        return env, agent_policy
     
 
 def print_items(**kwargs):

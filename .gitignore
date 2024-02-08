@@ -16,7 +16,7 @@ Haresh_Experiment
 *.zip
 experiments/results/
 experiments/old_results/
-notebooks/experiments/results/
+notebooks/experiments
 
 *put*.txt
 
