@@ -17,6 +17,7 @@ Haresh_Experiment
 experiments/results/
 experiments/old_results/
 notebooks/experiments
-
+run.log
+slurm*
 *put*.txt
 
