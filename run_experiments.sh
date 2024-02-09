@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source ../lit-llama/llmenv/bin/activate
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
 ITERS=100
@@ -7,13 +8,13 @@ ACTION_STD=0.02
 DECAY_RATE=0.99
 DECAY_START=0
 TOL=0.99
-W=0.3
-C1=0.4
-C2=0.3
+W=1.9
+C1=2.0
+C2=2.1
 SPLIT_INTERVAL=3
-function_end=3
+function_end=2
 
-start_exp_num=10000
+start_exp_num=1
 
 # Loop over function_id from 0 to 29
 for function_id in $(seq 0 $function_end)

@@ -87,7 +87,6 @@ opt_value = None
 
 import pandas 
 result_comparison = pandas.DataFrame(result_comparison)
-print(result_comparison)
 
 # save the result_comparison
 result_comparison.to_csv(f"experiments/results/result_comparison_function_{args.exp_numC}.csv")
