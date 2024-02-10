@@ -43,9 +43,9 @@ def mean_confidence_interval(data, confidence=0.95):
 all_symbols = ["-", "--", "-.", ":", "-", "--", "-.", ":"]
 all_colors = ["r", "g", "b", "k", "m", "c", "y", "r", "g", "b", "k", "m", "c", "y"]
 
-result_path = args.result_path
+result_path = f"experiment/results_{config["n_dim"}"
 exp_list = args.exp_list.split(",")
-print(exp_list)
+#print(exp_list)
 # remove the first character 
 # if exp_list[0][0] == "":
 if exp_list[0] == "":
@@ -97,3 +97,5 @@ plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_li
 
 plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"experiments/results/log_comparison_function_{args.exp_numC}.png",
                              n_agents=n_agents, opt_value=opt_value, log_scale=True, minimize=minimize)
+
+print(f"Completed Comparison for experiment {args.exp_numC}")

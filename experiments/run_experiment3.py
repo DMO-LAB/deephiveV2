@@ -22,7 +22,9 @@ import argparse
 
 
 def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_name, title=""):
-    result_path = 'experiments/results/' + exp_name + '/'
+    base_path = f'experiments/results_{env.n_dim}/
+    os.makedirs(base_path, exist_ok=True)
+    result_path = base_path + exp_name + '/'
     os.makedirs(result_path, exist_ok=True)
     
     objective_function = lambda x: -env.objective_function.evaluate(np.array([x]).reshape(1, -1))[0]
@@ -185,7 +187,9 @@ def optimize(env, agent_policy, obs, roles, config):
     return gbests
         
 def run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=""):
-    result_path = 'experiments/results/' + exp_name + '/'
+    base_path = f"experiments/results_{env.n_dim}/"
+    os.makedirs(base_path, exist_ok=True)
+    result_path = base_path  + exp_name + '/'
     os.makedirs(result_path, exist_ok=True)
     
     if isinstance(agent_policy, list):
@@ -324,7 +328,7 @@ if __name__ == "__main__":
     mode = "test"
 
     exp_name = "exp_" + str(args.exp_num)
-    result_path = 'experiments/results/' + str(exp_name) + '/' 
+    result_path = f'experiments/results_{config["n_dim"]}/' + str(exp_name) + '/' 
     os.makedirs(result_path, exist_ok=True)
 
     env, agent_policies = initialize(config, mode=mode, model_path=[model_path, model_path_2])
