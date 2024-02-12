@@ -3,7 +3,7 @@
 source ../lit-llama/llmenv/bin/activate
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
-ITERS=100
+ITERS=2
 ACTION_STD=0.02
 DECAY_RATE=0.995
 DECAY_START=5
@@ -12,13 +12,16 @@ W=0.7
 C1=0.8
 C2=0.5
 SPLIT_INTERVAL=3
-function_end=2
+function_end=10
 
-start_exp_num=1
+start_exp_num=0
+
 
 # Loop over function_id from 0 to 29
 for function_id in $(seq 0 $function_end)
+
 do
+    echo "Running experiment from $start_exp_num to $((start_exp_num+6)) for function_id $function_id"
     exp_list=""
     EXP_NUM=$start_exp_num
 
@@ -69,11 +72,12 @@ do
     TITLE="PSO"
     echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
     python experiments/run_experiment3.py --function_id $function_id --title "$TITLE" --exp_num $EXP_NUM --algo "$TITLE" --iters $ITERS --plot_gbest --pso_w $W --pso_c1 $C1 --pso_c2 $C2
-    
+
     wait 
     python experiments/compare.py --exp_list "$exp_list" --exp_numC $((function_id)) --minimize
-    # Increment the start_exp_num for the next function_id iteration
-    start_exp_num=$(((funtion_id+1)*10 + 1))
+
+    start_exp_num=$(((function_id+1)*10 + 1))
+
 done
 
 # Wait for all background jobs to finish
@@ -81,9 +85,13 @@ wait
 
 # Run comparisons for each function_id
 for function_id in {0..$((function_end))}
+
 do
     python experiments/compare.py --exp_list "$exp_list" --exp_numC $((function_id)) --minimize &
 done
+
 wait
+
+python experiments/benchmark.py
 
 echo "Finished running all experiments"
