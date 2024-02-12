@@ -105,7 +105,7 @@ def get_agent_actions(env, policy, obs, config, roles=None, split_agents=False,
         for i in range(len(explorers_id)):
             roles[int(explorers_id[i])] = 0
             
-        roles = [roles, roles]
+        roles = [roles for _ in range(env.n_dim)]
         # update env state history roles to the correct exploration/exploitation roles
         env.state_history[:, env.current_step, -2] = roles[0]
         

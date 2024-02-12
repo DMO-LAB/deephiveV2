@@ -6,7 +6,7 @@ print(sys.path)
 
 from deephive.environment.deephive_utils import *
 from deephive.environment.utils import *
-
+import traceback
 import argparse
 import json
 
@@ -88,6 +88,7 @@ for i, exp_num in enumerate(exp_list):
         color_list.append(all_colors[i])
     except:
         print(f"Experiment {exp_num} not found")
+        traceback.print_exc();
         continue
     
 opt_value = None
