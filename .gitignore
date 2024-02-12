@@ -15,9 +15,12 @@ Haresh_Experiment
 .png
 *.zip
 experiments/results/
+experiments/results*/
 experiments/old_results/
 notebooks/experiments
+experiments 2/
 run.log
 slurm*
 *put*.txt
+
 
