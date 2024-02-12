@@ -15,6 +15,7 @@ parser.add_argument("--result_path", type=str, default="experiments/results/")
 parser.add_argument("--exp_list", type=str, default="2,3")
 parser.add_argument("--exp_numC", type=int, default=1)
 parser.add_argument("--minimize", action='store_true')
+parser.add_argument("--n_dim", type=int, default=2)
 
 args = parser.parse_args()
 
@@ -43,7 +44,7 @@ def mean_confidence_interval(data, confidence=0.95):
 all_symbols = ["-", "--", "-.", ":", "-", "--", "-.", ":"]
 all_colors = ["r", "g", "b", "k", "m", "c", "y", "r", "g", "b", "k", "m", "c", "y"]
 
-result_path = f"experiments/results_{config['n_dim']}/"
+result_path = f"experiments/results_{args.n_dim}/"
 exp_list = args.exp_list.split(",")
 #print(exp_list)
 # remove the first character 

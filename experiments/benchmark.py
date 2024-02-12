@@ -9,12 +9,13 @@ config = parse_config(config_path)
 
 parser = argparse.ArgumentParser()  
 
-parser.add_argument("--result_path", type=str, default=f"experiments/results_{config['n_dim']}/")
+parser.add_argument("--n_dim", type=int, default=2)
+
 # parser.add_argument("--exp_list", type=str, default="2,3")
 
 args = parser.parse_args()
 
-result_path = args.result_path
+result_path = f"experiments/results_{args.n_dim}/"
 
 exp_list = [i for i in range(0, 29)]
 

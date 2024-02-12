@@ -287,6 +287,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_split_intervals', action='store_true')
     parser.add_argument('--split_ratio', type=float, default=0.5)
     parser.add_argument('--function_id', type=int, default=0)
+    parser.add_argument('--n_dim', type=int, default=2)
 
     
 
@@ -299,6 +300,7 @@ if __name__ == "__main__":
 
     config = parse_config(config_path)
 
+    config['n_dim'] = args.n_dim
     config['freeze'] = args.freeze
     config['use_gbest'] = args.use_gbest
     config['role_std'] = {'explorer': args.role_std_explorers, 'exploiter': args.role_std_exploiters}
