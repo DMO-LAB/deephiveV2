@@ -1,7 +1,7 @@
 {
     "env_name": "OptimizationEnv",
-    "n_agents": 40,
-    "n_dim": 20,
+    "n_agents": 10,
+    "n_dim": 2,
     "ep_length": 50,
     "init_state": null,
     "opt_bound": 0.9,
@@ -44,7 +44,6 @@
     "n_episodes":2000,
     "grid_resolution":0.1,
     "use_grid": false,
-
     "pso_omega": 0.5,
     "pso_phip": 2,
     "pso_phig": 2,
