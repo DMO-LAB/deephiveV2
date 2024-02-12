@@ -304,8 +304,8 @@ def plot_num_function_evaluation(
     color_list = color_list if color_list is not None else ['#3F7F4C', '#CC4F1B', '#FFB852', '#64B5CD']
     label_list = label_list if label_list is not None else ['EXP1', 'EXP2', 'EXP3', 'EXP4']
 
-    print(f"Number of function evaluations: {len(fopt[0])}")
-    print(f"Number of algorithms: {len(fopt)}")
+    # print(f"Number of function evaluations: {len(fopt[0])}")
+    # print(f"Number of algorithms: {len(fopt)}")
 
     plt.figure(figsize=(6, 4), dpi=200)
     for i, single_fopt in enumerate(fopt):
