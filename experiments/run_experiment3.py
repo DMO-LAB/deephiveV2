@@ -22,7 +22,7 @@ import argparse
 
 
 def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_name, title=""):
-    base_path = f'experiments/results_{env.n_dim}/
+    base_path = f'experiments/results_{env.n_dim}/'
     os.makedirs(base_path, exist_ok=True)
     result_path = base_path + exp_name + '/'
     os.makedirs(result_path, exist_ok=True)
@@ -326,7 +326,12 @@ if __name__ == "__main__":
         config['use_grid']  = True
 
     mode = "test"
-
+    
+    hybrid_functions = ['f10','f11', 'f12', 'f13', 'f14', 'f15', 'f16', 'f17', 'f18', 'f19', 'f20', 'f28', 'f29', 'f30']
+    if f"f{config['function_id']}" in range(11, 21) and config["n_dim"] <= 2:
+        print(f"[ERROR] - Hybrid function {config['function_id']} is not supported for n_dim <= 2")
+        sys.exit(1)
+        
     exp_name = "exp_" + str(args.exp_num)
     result_path = f'experiments/results_{config["n_dim"]}/' + str(exp_name) + '/' 
     os.makedirs(result_path, exist_ok=True)
