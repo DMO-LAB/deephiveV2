@@ -43,7 +43,7 @@ def mean_confidence_interval(data, confidence=0.95):
 all_symbols = ["-", "--", "-.", ":", "-", "--", "-.", ":"]
 all_colors = ["r", "g", "b", "k", "m", "c", "y", "r", "g", "b", "k", "m", "c", "y"]
 
-result_path = f"experiment/results_{config["n_dim"}"
+result_path = f"experiments/results_{config['n_dim']}/"
 exp_list = args.exp_list.split(",")
 #print(exp_list)
 # remove the first character 
@@ -62,26 +62,33 @@ gbest_values = []
 opt_value = 0
 result_comparison = []
 for i, exp_num in enumerate(exp_list):
-    
-    exp_path = result_path + "exp_" + str(exp_num) + "/"
-    # load the .npy file
-    gbest = np.load(exp_path + f"gbestVals.npy") * -1 if minimize else np.load(exp_path + f"gbestVals.npy")
-    gbest_values.append(gbest)
-    mean, lower, upper = mean_confidence_interval(gbest)
-    # load json
-    with open(exp_path + "run_summary.json") as f:
-        config = json.load(f)
-    label_list.append(config["title"])
-    result_comparison.append({
-        "title": label_list[i],
-        "mean": np.round(mean[-1], 4),
-        "lower": np.round(lower[-1], 4),
-        "upper": np.round(upper[-1], 4)
-    })
-    # get the symbol
-    symbol_list.append(all_symbols[i])
-    # get the color
-    color_list.append(all_colors[i])
+    try:
+        exp_path = result_path + "exp_" + str(exp_num) + "/"
+        # load the .npy file
+        gbest = np.load(exp_path + f"gbestVals.npy") * -1 if minimize else np.load(exp_path + f"gbestVals.npy")
+        gbest_values.append(gbest)
+        mean, lower, upper = mean_confidence_interval(gbest)
+        mid_mean, mid_lower, mid_upper = mean_confidence_interval(gbest[:, :len(gbest[0])//2])
+        # load json
+        with open(exp_path + "run_summary.json") as f:
+            config = json.load(f)
+        label_list.append(config["title"])
+        result_comparison.append({
+            "title": label_list[i],
+            "mean": np.round(mean[-1], 4),
+            "lower": np.round(lower[-1], 4),
+            "upper": np.round(upper[-1], 4),
+            "mid_mean": np.round(mid_mean[-1], 4),
+            "mid_lower": np.round(mid_lower[-1], 4),
+            "mid_upper": np.round(mid_upper[-1], 4),
+        })
+        # get the symbol
+        symbol_list.append(all_symbols[i])
+        # get the color
+        color_list.append(all_colors[i])
+    except:
+        print(f"Experiment {exp_num} not found")
+        continue
     
 opt_value = None
 
@@ -89,13 +96,15 @@ import pandas
 result_comparison = pandas.DataFrame(result_comparison)
 
 # save the result_comparison
-result_comparison.to_csv(f"experiments/results/result_comparison_function_{args.exp_numC}.csv")
+result_comparison.to_csv(f"{result_path}result_comparison_function_{args.exp_numC}.csv")
 
 # plot the gbest_values
-plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"experiments/results/comparison_function_{args.exp_numC}.png",
+plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"{result_path}comparison_function_{args.exp_numC}.png",
                              n_agents=n_agents, opt_value=opt_value, log_scale=False, minimize=minimize)
 
-plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"experiments/results/log_comparison_function_{args.exp_numC}.png",
+plot_num_function_evaluation(fopt=gbest_values, label_list=label_list, symbol_list=symbol_list, color_list=color_list, save_dir=f"{result_path}log_comparison_function_{args.exp_numC}.png",
                              n_agents=n_agents, opt_value=opt_value, log_scale=True, minimize=minimize)
 
 print(f"Completed Comparison for experiment {args.exp_numC}")
+
+
