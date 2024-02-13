@@ -15,7 +15,7 @@ parser.add_argument("--n_dim", type=int, default=2)
 
 args = parser.parse_args()
 
-result_path = f"experiments_2/results_{args.n_dim}/"
+result_path = f"experiments/results_{args.n_dim}/"
 
 exp_list = [i for i in range(0, 29)]
 

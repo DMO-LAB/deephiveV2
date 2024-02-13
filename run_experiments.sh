@@ -2,7 +2,7 @@
 
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
-ITERS=100
+ITERS=10
 ACTION_STD=0.02
 DECAY_RATE=0.995
 DECAY_START=5
@@ -10,9 +10,9 @@ TOL=0.99
 W=0.7
 C1=0.8
 C2=0.5
-SPLIT_INTERVAL=3
-function_end=13
-n_dims=(2 10, 20, 30, 50, 100) # Changed to bash array syntax
+SPLIT_INTERVAL=5
+function_end=29
+n_dims=(2 10 20 30 50 100) # Changed to bash array syntax
 
 # Loop over each dimension in n_dims
 for n_dim in "${n_dims[@]}"
@@ -23,7 +23,7 @@ do
     start_exp_num=0
 
     # Loop over function_id from 0 to 29
-    for function_id in $(seq 10 $function_end)
+    for function_id in $(seq 0 $function_end)
     do
         echo "Running experiment from $start_exp_num to $((start_exp_num+6)) for function_id $function_id with n_dim=$n_dim"
         exp_list=""
@@ -87,6 +87,7 @@ do
     wait
     # Run comparisons for each function_id (if needed, ensure this part also uses the current n_dim)
     python experiments/benchmark.py --n_dim $n_dim
+
     echo "Finished running all experiments for n_dim=$n_dim"
 done
 
