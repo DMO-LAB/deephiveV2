@@ -19,6 +19,7 @@ import warnings
 warnings.filterwarnings("ignore")
 from datetime import datetime
 import argparse
+import traceback
 
 
 def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_name, title=""):
@@ -32,45 +33,55 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
     
     gbestVals = []
     opt_value = env.objective_function.optimal_value(dim=env.n_dim)
-    for _ in range(config['iters']):
-        if isinstance(algorithm, GA):
-            algorithm = GA(func=objective_function, n_dim=env.n_dim, size_pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound, precision=[1e-7 for _ in range(env.n_dim)])
-            ga = algorithm
-            _ = ga.run()
-            gbVal = [ga.generation_best_Y[i] * -1 for i in range(len(ga.generation_best_Y))]
-            gbestVals.append(gbVal)
-        elif isinstance(algorithm, PSO):
-            algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
-                            w = config['w'], c1 = config['c1'], c2 = config['c2'])
-            pso = algorithm
-            _ = pso.run()
-            gbVal = [pso.gbest_y_hist[i][0] * -1 for i in range(len(pso.gbest_y_hist))]
-            gbestVals.append(gbVal)
-        elif isinstance(algorithm, SA):
-            algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])
-            sa = algorithm
-            _ = sa.run()
-            gbestVals.append(sa.best_y_history * -1)
-        else:
-            raise ValueError("algorithm must be either GA, PSO or SA")
-    
-    gb = np.array(gbestVals)
-    np.save(result_path + "gbestVals.npy", gb)
+    try:
+        for _ in range(config['iters']):
+            try:
+                if isinstance(algorithm, GA):
+                    algorithm = GA(func=objective_function, n_dim=env.n_dim, size_pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound, precision=[1e-7 for _ in range(env.n_dim)])
+                    ga = algorithm
+                    _ = ga.run()
+                    gbVal = [ga.generation_best_Y[i] * -1 for i in range(len(ga.generation_best_Y))]
+                    gbestVals.append(gbVal)
+                elif isinstance(algorithm, PSO):
+                    algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
+                                    w = config['w'], c1 = config['c1'], c2 = config['c2'])
+                    pso = algorithm
+                    _ = pso.run()
+                    gbVal = [pso.gbest_y_hist[i][0] * -1 for i in range(len(pso.gbest_y_hist))]
+                    gbestVals.append(gbVal)
+                elif isinstance(algorithm, SA):
+                    algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])
+                    sa = algorithm
+                    _ = sa.run()
+                    gbestVals.append(sa.best_y_history * -1)
+                else:
+                    raise ValueError("algorithm must be either GA, PSO or SA")
+            except Exception as e:
+                raise e
         
-    if config['plot_gbest']:
-            num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
-                                    log_scale=False, plot_error_bounds=True, title=title)
-            plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
-                                    log_scale=False, title=title)
+        gb = np.array(gbestVals)
+        np.save(result_path + "gbestVals.npy", gb)
             
-    run_summary = {
-    "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-    "title": title,
-    "opt_value": opt_value,
-}
+        if config['plot_gbest']:
+                num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
+                                        log_scale=False, plot_error_bounds=True, title=title)
+                plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
+                                        log_scale=False, title=title)
+                
+        run_summary = {
+        "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+        "title": title,
+        "opt_value": opt_value,
+    }
+        
+        with open(result_path + "run_summary.json", 'w') as f:
+            json.dump(run_summary, f)
     
-    with open(result_path + "run_summary.json", 'w') as f:
-        json.dump(run_summary, f)
+    except Exception as e:
+        print(f"Error in experiment {exp_name}")
+        # print(e)
+        # traceback.print_exc()
+        return None
         
         
 
@@ -199,62 +210,72 @@ def run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=""
     
     opt_value = env.objective_function.optimal_value(dim=env.n_dim)
     gbestVals = []
-    for iter in range(config['iters']):
-        obs, roles = env.reset()
-        if isinstance(agent_policy, list):
-            agent_policy[0].std_controller.reset_std()
-            agent_policy[1].std_controller.reset_std()
-        else:
-            agent_policy.std_controller.reset_std()
-        episode_gbest = []
-        episode_gbest.append(env.gbest[-1])
+    try:
+        for iter in range(config['iters']):
+            obs, roles = env.reset()
+            if isinstance(agent_policy, list):
+                agent_policy[0].std_controller.reset_std()
+                agent_policy[1].std_controller.reset_std()
+            else:
+                agent_policy.std_controller.reset_std()
+            episode_gbest = []
+            episode_gbest.append(env.gbest[-1])
+            try:
+                gbests = optimize(env, agent_policy, obs, roles, config)
+                # combine gbests to episode gbest
+                episode_gbest.extend(gbests)
+            except Exception as e:
+                raise e
         
-        gbests = optimize(env, agent_policy, obs, roles, config)
-        # combine gbests to episode gbest
-        episode_gbest.extend(gbests)
-        #print(f"Episode gbests - {episode_gbest}")
+            # if env.gbest[-1] < config['tol'] * opt_value:
+            #     print(f"[WARNING - iter {iter}] - Optimization failed to get to {config['tol']}% of optimal value - {opt_value}")
+            #     print(f"Best value found: {env.gbest[-1]}")
+            #     print("Rendering the episode history ...")
+            #     print("------------------------------------------")
+            #     env.render(type="history", file_path=result_path + "error_history_" + str(iter) + "_.gif")
+            if save_gif:
+                if iter % 100 == 0:
+                    env.render(type="history", file_path=result_path + "history_" + str(iter) + "_.gif")
+            gbestVals.append(episode_gbest)
+        
     
-        # if env.gbest[-1] < config['tol'] * opt_value:
-        #     print(f"[WARNING - iter {iter}] - Optimization failed to get to {config['tol']}% of optimal value - {opt_value}")
-        #     print(f"Best value found: {env.gbest[-1]}")
-        #     print("Rendering the episode history ...")
-        #     print("------------------------------------------")
-        #     env.render(type="history", file_path=result_path + "error_history_" + str(iter) + "_.gif")
-        if save_gif:
-            if iter % 100 == 0:
-                env.render(type="history", file_path=result_path + "history_" + str(iter) + "_.gif")
-        gbestVals.append(episode_gbest)
-        
-    # save gbestVals
-    np.save(result_path + "gbestVals.npy", np.array(gbestVals))
-        
-    if config['plot_gbest']:
-        
-            num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
-                                    log_scale=False, plot_error_bounds=True, title=title)
-            
-            plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
-                                    log_scale=False, title=title)
-            
-            
-    run_summary = {
-    "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-    "title": title,
-    "split_agents": config['split_agents'],
-    "split_type": config['split_type'],
-    "decay_std": config['decay_std'],
-    "decay_start": config['decay_start'],
-    "freeze": config['freeze'],
-    "use_gbest": config['use_gbest'],
-    "variable_std": config['variable_std'],
-    "role_std": config['role_std'],
-    "decay_std": config['decay_std'],
-    "opt_value": opt_value,
-}
+        # save gbestVals
+        np.save(result_path + "gbestVals.npy", np.array(gbestVals))
     
-    with open(result_path + "run_summary.json", 'w') as f:
-        json.dump(run_summary, f)
+    
         
+        if config['plot_gbest']:
+            
+                num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
+                                        log_scale=False, plot_error_bounds=True, title=title)
+                
+                plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
+                                        log_scale=False, title=title)
+                
+                
+        run_summary = {
+        "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+        "title": title,
+        "split_agents": config['split_agents'],
+        "split_type": config['split_type'],
+        "decay_std": config['decay_std'],
+        "decay_start": config['decay_start'],
+        "freeze": config['freeze'],
+        "use_gbest": config['use_gbest'],
+        "variable_std": config['variable_std'],
+        "role_std": config['role_std'],
+        "decay_std": config['decay_std'],
+        "opt_value": opt_value,
+    }
+        
+        with open(result_path + "run_summary.json", 'w') as f:
+            json.dump(run_summary, f)
+    
+    except Exception as e:
+        print(f"Error in experiment {exp_name}")
+        # print(e)
+        # traceback.print_exc()
+        return None
         
         
 if __name__ == "__main__":
@@ -334,6 +355,11 @@ if __name__ == "__main__":
         print(f"[ERROR] - Hybrid function {config['function_id']} is not supported for n_dim <= 2")
         sys.exit(1)
         
+    if config["n_dim"] > 2:
+        config["n_agents"] = 10
+    else:
+        config["n_agents"] = 40
+        
     exp_name = "exp_" + str(args.exp_num)
     result_path = f'experiments/results_{config["n_dim"]}/' + str(exp_name) + '/' 
     os.makedirs(result_path, exist_ok=True)
@@ -372,19 +398,24 @@ if __name__ == "__main__":
     objective_function = lambda x: -env.objective_function.evaluate(np.array([x]).reshape(1, -1))[0]
     lower_bound, upper_bound = env.objective_function.bounds(dim=env.n_dim)[0].tolist(), env.objective_function.bounds(dim=env.n_dim)[1].tolist()
 
-
-    if args.algo == "GA":
-        algorithm = GA(func=objective_function, n_dim=env.n_dim, size_pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound, precision=[1e-7 for _ in range(env.n_dim)])
-        run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
-    elif args.algo == "PSO":
-        algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
-                        w = config['w'], c1 = config['c1'], c2 = config['c2'])
-        run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
-    elif args.algo == "SA":
-        algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])
-        run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
-    elif args.algo == "Deephive":
-        run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=title)
-    else:
-        raise ValueError("algo must be either GA, PSO, SA or Deephive")
+    try:
+        if args.algo == "GA":
+            algorithm = GA(func=objective_function, n_dim=env.n_dim, size_pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound, precision=[1e-7 for _ in range(env.n_dim)])
+            run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
+        elif args.algo == "PSO":
+            algorithm = PSO(func=objective_function, n_dim=env.n_dim, pop=config['n_agents'], max_iter=config['ep_length'], lb=lower_bound, ub=upper_bound,
+                            w = config['w'], c1 = config['c1'], c2 = config['c2'])
+            run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
+        elif args.algo == "SA":
+            algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])
+            run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
+        elif args.algo == "Deephive":
+            run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=title)
+        else:
+            raise ValueError("algo must be either GA, PSO, SA or Deephive")
+    except Exception as e:
+        print(f"Error in experiment {exp_name}")
+        # print(e)
+        # traceback.print_exc()
+        sys.exit(1)
     
