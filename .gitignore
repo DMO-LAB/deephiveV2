@@ -19,6 +19,7 @@ experiments/results*/
 experiments/old_results/
 notebooks/experiments
 experiments 2/
+experiments_2/
 run.log
 slurm*
 *put*.txt
