@@ -89,7 +89,6 @@ for i, exp_num in enumerate(exp_list):
         color_list.append(all_colors[i])
     except:
         print(f"Experiment {exp_num} not found")
-        traceback.print_exc();
         continue
     
 opt_value = None
