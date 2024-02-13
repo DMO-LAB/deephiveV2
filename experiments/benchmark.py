@@ -15,7 +15,7 @@ parser.add_argument("--n_dim", type=int, default=2)
 
 args = parser.parse_args()
 
-result_path = f"experiments/results_{args.n_dim}/"
+result_path = f"experiments_2/results_{args.n_dim}/"
 
 exp_list = [i for i in range(0, 29)]
 
@@ -24,6 +24,8 @@ for exp in exp_list:
     try:
         exp_path = os.path.join(result_path, f"result_comparison_function_{exp}.csv")
         df = pd.read_csv(exp_path)
+        # keep only the first 2 and rhe last row of the dataframe
+        df = df.iloc[[0, 1, -1]]
         # do  not add empty dataframes
         if not df.empty:
             dfs.append(df)
@@ -79,6 +81,10 @@ def create_benchmark_tables(dfs):
     return combined_df.style.apply(highlight_min, axis=1)
 
 
-result_comparison = create_benchmark_tables(dfs)
-# save the result_comparison
-result_comparison.to_excel(f"{result_path}result_comparison_function.xlsx")
+try:
+    result_comparison = create_benchmark_tables(dfs)
+    # save the result_comparison
+    result_comparison.to_excel(f"{result_path}result_comparison_function_sp.xlsx")
+except:
+    print("Error creating the benchmark tables")
+    pass
