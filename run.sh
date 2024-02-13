@@ -2,7 +2,7 @@
 #SBATCH -N 1                    # request two nodes
 #SBATCH -n 1
 #SBATCH --cpus-per-task=32                  # specify 16 MPI processes (8 per node)
-#SBATCH -t 05:00:00
+#SBATCH -t 15:00:00
 #SBATCH -p single
 #SBATCH -A hpc_llm_mech
 #SBATCH -o slurm-%j.out-%N # optional, name of the stdout, using the job number (%j) and the first node (%N)

@@ -25,7 +25,7 @@ for exp in exp_list:
         exp_path = os.path.join(result_path, f"result_comparison_function_{exp}.csv")
         df = pd.read_csv(exp_path)
         # keep only the first 2 and rhe last row of the dataframe
-        df = df.iloc[[0, 1, -1]]
+        #df = df.iloc[[0, 1, -1]]
         # do  not add empty dataframes
         if not df.empty:
             dfs.append(df)
@@ -85,6 +85,7 @@ try:
     result_comparison = create_benchmark_tables(dfs)
     # save the result_comparison
     result_comparison.to_excel(f"{result_path}result_comparison_function_sp.xlsx")
-except:
+except Exception as e:
     print("Error creating the benchmark tables")
-    pass
+    print(e)
+    import traceback; traceback.print_exc();

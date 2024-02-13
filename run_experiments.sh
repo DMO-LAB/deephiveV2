@@ -2,7 +2,7 @@
 
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
-ITERS=10
+ITERS=100
 ACTION_STD=0.02
 DECAY_RATE=0.995
 DECAY_START=5
