@@ -112,6 +112,8 @@ class ActorCritic(nn.Module):
         action_mean = self.actor(state)  
         if self.variable_std:
             action_var = self.get_std(std_obs) # type: ignore
+            # print(f"action_mean: {action_mean}, action_var: {action_var}")
+            # print(f"Action mean shape: {action_mean.shape}, action_var shape: {action_var.shape}")
             dist = tdist.Normal(action_mean, action_var)
             action = dist.sample().diag()
         else:
@@ -219,6 +221,8 @@ class MAPPO:
         self.MSE_loss = nn.MSELoss()
 
 
+        
+
     def __str__(self):
              return f"MAPPO: {self.n_agents} agents, {self.n_dim} dimensions, {self.action_std} action std, {self.lr} lr, {self.beta} beta, {self.gamma} gamma, {self.K_epochs} epochs, {self.eps_clip} eps_clip"
 
@@ -226,6 +230,8 @@ class MAPPO:
         state = torch.FloatTensor(state).to(device)  # Flatten the state
         std_obs = torch.FloatTensor(std_obs).to(device)
         action, action_logprob = self.policy.act(state, std_obs)
+        if self.pretrained:
+            return action.detach().cpu().numpy().flatten()
         for i in range(self.n_agents):
             self.buffer.states.append(state[i])
             self.buffer.std_obs.append(std_obs[i])
@@ -326,3 +332,11 @@ class MAPPO:
     def load(self, filename):
         self.policy.load_state_dict(torch.load(filename, map_location=lambda storage, loc: storage))
         print("Loaded policy from: ", filename)
+
+
+    # create a function to deep copy the policy
+    def deepcopy(self):
+        new_policy = MAPPO(self.kwargs)
+        new_policy.policy.load_state_dict(self.policy.state_dict())
+        new_policy.old_policy.load_state_dict(self.old_policy.state_dict())
+        return new_policy
