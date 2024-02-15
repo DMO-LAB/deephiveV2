@@ -20,6 +20,8 @@ warnings.filterwarnings("ignore")
 from datetime import datetime
 import argparse
 import traceback
+import time 
+from concurrent.futures import ProcessPoolExecutor
 
 
 def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_name, title=""):
@@ -34,6 +36,7 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
     gbestVals = []
     opt_value = env.objective_function.optimal_value(dim=env.n_dim)
     try:
+        iteration_start_time = time.time()
         for _ in range(config['iters']):
             try:
                 if isinstance(algorithm, GA):
@@ -58,6 +61,8 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
                     raise ValueError("algorithm must be either GA, PSO or SA")
             except Exception as e:
                 raise e
+        iteration_end_time = time.time()
+        print(f"[PSO]: Time taken for {config['iters']} iterations: {iteration_end_time - iteration_start_time} seconds")
         
         gb = np.array(gbestVals)
         np.save(result_path + "gbestVals.npy", gb)
@@ -82,23 +87,30 @@ def run_experiment_other_algorithm(algorithm:[GA, PSO, SA], env, config, exp_nam
         # print(e)
         # traceback.print_exc()
         return None
-        
-        
 
 def get_agent_actions(env, policy, obs, config, roles=None, split_agents=False,
                       split_type="use_stds", decay_std=False, split_ratio=1, dynamic_split=False, **kwargs):
     
     if decay_std:
-        policy.std_controller.decay_std()
-    if split_agents==False:
-        if config["variable_std"][0] == True:
-            obs_std = policy.std_controller.get_all_std()
-            actions = get_action(obs, policy, env, obs_std)
+        if isinstance(policy, list):
+            policy[0].std_controller.decay_std()
+            policy[1].std_controller.decay_std()
         else:
-            actions = get_action(obs, policy, env)
+            policy.std_controller.decay_std()
+        
+    # Pre-compute common variables and conditions
+    variable_std_enabled = config["variable_std"][0]
+    if isinstance(policy, list):
+        obs_std = policy[0].std_controller.get_all_std() if variable_std_enabled else None
+    else:
+        obs_std = policy.std_controller.get_all_std() if variable_std_enabled else None
+
+    if not split_agents:
+        actions = get_action(obs, policy, env, obs_std) if variable_std_enabled else get_action(obs, policy, env)
         return actions
-    elif split_agents==True:
+    else:
         assert roles is not None, "Roles must be provided if split_agents is True"
+        # Efficiently manage agent splitting
         if kwargs.get("exploiter_ids") is not None: 
             exploiters_id = kwargs.get("exploiter_ids")
             explorers_id = kwargs.get("explorer_ids")
@@ -107,61 +119,46 @@ def get_agent_actions(env, policy, obs, config, roles=None, split_agents=False,
                 exploiters_id = np.where(roles[0] == 1)[0]
                 explorers_id = np.where(roles[0] == 0)[0]
             else:
-                # use the split ratio to split the agents
                 explorers_id = np.random.choice(env.n_agents, int(env.n_agents * split_ratio), replace=False)
                 exploiters_id = np.setdiff1d(np.arange(env.n_agents), explorers_id)
-        roles = np.zeros((env.n_agents))
-        for i in range(len(exploiters_id)):
-            roles[int(exploiters_id[i])] = 1
-        for i in range(len(explorers_id)):
-            roles[int(explorers_id[i])] = 0
-            
-        roles = [roles for _ in range(env.n_dim)]
-        # update env state history roles to the correct exploration/exploitation roles
-        env.state_history[:, env.current_step, -2] = roles[0]
-        
+                #print(f"Explorers: {explorers_id}, Exploiters: {exploiters_id}")
+
+        #print(f"Explorers: {explorers_id}, Exploiters: {exploiters_id}")
+        roles = np.zeros(env.n_agents)
+        exploiters_id = np.array(exploiters_id, dtype=int)
+        roles[exploiters_id] = 1
+        roles = np.tile(roles, (env.n_dim, 1)).T  # Optimized roles computation
+        env.state_history[:, env.current_step, -2] = roles[:, 0]  # Updated for vectorization
+
+        roles = roles.reshape(env.n_dim, env.n_agents)
         if split_type == "use_stds":
             policy.std_controller.update_roles(roles)
-            obs_std = policy.std_controller.get_all_std()
-            #print(obs_std)
-            assert config['variable_std'][0] == True, "variable_std must be True in config"
+            assert variable_std_enabled, "variable_std must be True in config"
             assert config['role_std']['explorer'] > config['role_std']['exploiter'], "explorers must have higher std than exploiters"
-            # print(f"Explorers std: {config['role_std']['explorer']}")
-            # print(f"Exploiters std: {config['role_std']['exploiter']}")
-            # print(f"Obs std: {obs_std}")
-            # print(f"Gbest: {env.gbest}")
-            
             actions = get_action(obs, policy, env, obs_std)
-            return actions
         elif split_type == "use_grid":
             policy.std_controller.update_roles(roles)
-            obs_std = policy.std_controller.get_all_std()
             explorer_actions, _ = get_informed_action(env, env.n_agents)
             exploiter_actions = get_action(obs, policy, env, obs_std)
             actions = np.zeros((env.n_agents, env.n_dim))
-            if explorers_id.size > 0:
-                actions[explorers_id] = explorer_actions[explorers_id]
-            if exploiters_id.size > 0:
-                # print(exploiters_id.size)
-                # print(exploiters_id)
-                actions[exploiters_id] = exploiter_actions[exploiters_id]
-            return actions
+            actions[explorers_id] = explorer_actions[explorers_id]
+            actions[exploiters_id] = exploiter_actions[exploiters_id]
         elif split_type == "use_two_policies":
             policy[0].std_controller.update_roles(roles)
             obs_std = policy[0].std_controller.get_all_std()
-            obs_explore, roles = env.observation_schemes.generate_observation(pbest=env.pbest.copy(), use_gbest=False, ratio=env.split_ratio)
-            obs_exploit, roles = env.observation_schemes.generate_observation(pbest=env.pbest.copy(), use_gbest=True, ratio=env.split_ratio)
+            obs_explore, _ = env.observation_schemes.generate_observation(pbest=env.pbest.copy(), use_gbest=False, ratio=env.split_ratio)
+            obs_exploit, _ = env.observation_schemes.generate_observation(pbest=env.pbest.copy(), use_gbest=True, ratio=env.split_ratio)
             exploit_std_obs = policy[1].std_controller.get_all_std(std=config["exploit_std"])
-            assert len(policy) == 2, "Two policies must be provided - first policy is for explorers and second policy is for exploiters"
+            assert len(policy) == 2, "Two policies must be provided"
             explorer_actions = get_action(obs_explore, policy[0], env, obs_std)
             exploiter_actions = get_action(obs_exploit, policy[1], env, exploit_std_obs)
             actions = np.zeros((env.n_agents, env.n_dim))
-            if explorers_id.size > 0:
-                actions[explorers_id] = explorer_actions[explorers_id]
-            if exploiters_id.size > 0:
-                actions[exploiters_id] = exploiter_actions[exploiters_id]
-            return actions
-            
+            actions[explorers_id] = explorer_actions[explorers_id]
+            actions[exploiters_id] = exploiter_actions[exploiters_id]
+
+        return actions
+        
+        
 def optimize(env, agent_policy, obs, roles, config):
     gbests = []
     split_interval = config['split_interval']
@@ -171,6 +168,7 @@ def optimize(env, agent_policy, obs, roles, config):
     else:
         exploiters_id = np.where(roles[0] == 1)[0]
         explorers_id = np.where(roles[0] == 0)[0]
+    episode_start_time = time.time()
     for i in range(config['ep_length']):
         if i == config['decay_start']:
             decay_std_run = config['decay_std']
@@ -195,56 +193,63 @@ def optimize(env, agent_policy, obs, roles, config):
         observation_info, _, _, _ = env.step(actions)
         obs, roles = observation_info
         gbests.append(env.gbest[-1])
+        #print(f"Step {i} - Best value: {env.gbest[-1]}")
+    episode_end_time = time.time()
+    #print(f"Time taken for {config['ep_length']} iterations: {episode_end_time - episode_start_time} seconds")
     return gbests
         
-def run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=""):
+        
+def run_single_iteration(env, agent_policy, config, result_path, iter_num, save_gif=False):
+    # This function is designed to run a single iteration of the experiment.
+    # Since multiprocessing requires functions to be picklable, global variables and complex objects
+    # passed to this function should be minimized or managed accordingly.
+
+    env = env.deepcopy()
+    #agent_policy = agent_policy.deepcopy()
+    
+    obs, roles = env.reset()
+    if isinstance(agent_policy, list):
+        agent_policy[0].std_controller.reset_std()
+        agent_policy[1].std_controller.reset_std()
+    else:
+        agent_policy.std_controller.reset_std()
+    episode_gbest = [env.gbest[-1]]
+    try:
+        gbests = optimize(env, agent_policy, obs, roles, config)
+        episode_gbest.extend(gbests)
+        #print(f"Episode {iter_num} - Best value: {env.gbest[-1]}")
+    except Exception as e:
+        traceback.print_exc()
+        raise e
+    
+    if save_gif and iter_num % 100 == 0:
+        env.render(type="history", file_path=result_path + "history_" + str(iter_num) + "_.gif")
+    
+    return episode_gbest
+
+def run_experiment_concurrently(env, agent_policy, config, exp_name, save_gif=False, title=""):
     base_path = f"experiments/results_{env.n_dim}/"
     os.makedirs(base_path, exist_ok=True)
-    result_path = base_path  + exp_name + '/'
+    result_path = base_path + exp_name + '/'
     os.makedirs(result_path, exist_ok=True)
-    
-    if isinstance(agent_policy, list):
-        assert config['split_agents'] == True, "split_agents must be True in config"
-        assert config['split_type'] == "use_two_policies", "split_type must be use_two_policies in config"
-        assert len(agent_policy) == 2, "Two policies must be provided - first policy is for explorers and second policy is for exploiters"
-    
-    opt_value = env.objective_function.optimal_value(dim=env.n_dim)
+
     gbestVals = []
-    try:
-        for iter in range(config['iters']):
-            obs, roles = env.reset()
-            if isinstance(agent_policy, list):
-                agent_policy[0].std_controller.reset_std()
-                agent_policy[1].std_controller.reset_std()
-            else:
-                agent_policy.std_controller.reset_std()
-            episode_gbest = []
-            episode_gbest.append(env.gbest[-1])
+
+    start_time = time.time()
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_single_iteration, env, agent_policy, config, result_path, iter_num, save_gif)
+                   for iter_num in range(config['iters'])]
+
+        for future in futures:
             try:
-                gbests = optimize(env, agent_policy, obs, roles, config)
-                # combine gbests to episode gbest
-                episode_gbest.extend(gbests)
+                episode_gbest = future.result()
+                gbestVals.append(episode_gbest)
             except Exception as e:
-                raise e
-        
-            # if env.gbest[-1] < config['tol'] * opt_value:
-            #     print(f"[WARNING - iter {iter}] - Optimization failed to get to {config['tol']}% of optimal value - {opt_value}")
-            #     print(f"Best value found: {env.gbest[-1]}")
-            #     print("Rendering the episode history ...")
-            #     print("------------------------------------------")
-            #     env.render(type="history", file_path=result_path + "error_history_" + str(iter) + "_.gif")
-            if save_gif:
-                if iter % 100 == 0:
-                    env.render(type="history", file_path=result_path + "history_" + str(iter) + "_.gif")
-            gbestVals.append(episode_gbest)
-        
-    
-        # save gbestVals
-        np.save(result_path + "gbestVals.npy", np.array(gbestVals))
-    
-    
-        
-        if config['plot_gbest']:
+                traceback.print_exc()
+                print(f"Error in iteration: {e}")
+
+    np.save(result_path + "gbestVals.npy", np.array(gbestVals))
+    if config['plot_gbest']:
             
                 num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
                                         log_scale=False, plot_error_bounds=True, title=title)
@@ -253,30 +258,74 @@ def run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=""
                                         log_scale=False, title=title)
                 
                 
-        run_summary = {
-        "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-        "title": title,
-        "split_agents": config['split_agents'],
-        "split_type": config['split_type'],
-        "decay_std": config['decay_std'],
-        "decay_start": config['decay_start'],
-        "freeze": config['freeze'],
-        "use_gbest": config['use_gbest'],
-        "variable_std": config['variable_std'],
-        "role_std": config['role_std'],
-        "decay_std": config['decay_std'],
-        "opt_value": opt_value,
-    }
-        
-        with open(result_path + "run_summary.json", 'w') as f:
-            json.dump(run_summary, f)
+    run_summary = {
+    "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    "title": title,
+    "split_agents": config['split_agents'],
+    "split_type": config['split_type'],
+    "decay_std": config['decay_std'],
+    "decay_start": config['decay_start'],
+    "freeze": config['freeze'],
+    "use_gbest": config['use_gbest'],
+    "variable_std": config['variable_std'],
+    "role_std": config['role_std'],
+    "decay_std": config['decay_std'],
+}
     
-    except Exception as e:
-        print(f"Error in experiment {exp_name}")
-        # print(e)
-        # traceback.print_exc()
-        return None
+    with open(result_path + "run_summary.json", 'w') as f:
+        json.dump(run_summary, f)
         
+    end_time = time.time()
+    print(f"[DEEPHIVE]: Time taken for {config['iters']} iterations: {end_time - start_time} seconds")
+    
+    
+def run_experiment_sequentially(env, agent_policy, config, exp_name, save_gif=False, title=""):
+    base_path = f"experiments/results_{env.n_dim}/"
+    os.makedirs(base_path, exist_ok=True)
+    result_path = base_path + exp_name + '/'
+    os.makedirs(result_path, exist_ok=True)
+
+    gbestVals = []
+
+    start_time = time.time()
+    for i in range(config['iters']):
+        try:
+            episode_gbest = run_single_iteration(env, agent_policy, config, result_path, i, save_gif)
+            gbestVals.append(episode_gbest)
+        except Exception as e:
+            traceback.print_exc()
+            print(f"Error in iteration: {e}")
+            
+    # end_time = time.time()
+    np.save(result_path + "gbestVals.npy", np.array(gbestVals))
+    if config['plot_gbest']:
+        num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
+                                log_scale=False, plot_error_bounds=True, title=title)
+        
+        plot_individual_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations2.png", opt_value=opt_value,
+                                log_scale=False, title=title)
+                    
+    run_summary = {
+    "time": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    "title": title,
+    "split_agents": config['split_agents'],
+    "split_type": config['split_type'],
+    "decay_std": config['decay_std'],
+    "decay_start": config['decay_start'],
+    "freeze": config['freeze'],
+    "use_gbest": config['use_gbest'],
+    "variable_std": config['variable_std'],
+    "role_std": config['role_std'],
+    "decay_std": config['decay_std'],
+}
+    with open(result_path + "run_summary.json", 'w') as f:
+        json.dump(run_summary, f)
+        
+    end_time = time.time()
+    print(f"[DEEPHIVE]: Time taken for {config['iters']} iterations: {end_time - start_time} seconds")
+    
+    
+
         
 if __name__ == "__main__":
     
@@ -362,7 +411,7 @@ if __name__ == "__main__":
     elif config["n_dim"] == 100:
         config["n_agents"] = 100
     else:
-        config["n_agents"] = 40
+        config["n_agents"] = 50
         
     exp_name = "exp_" + str(args.exp_num)
     result_path = f'experiments/results_{config["n_dim"]}/' + str(exp_name) + '/' 
@@ -414,7 +463,7 @@ if __name__ == "__main__":
             algorithm = SA(func=objective_function, x0=lower_bound, T_max=config['T_max'], T_min=config['T_min'], L=config['L'], max_stay_counter=config['max_stay_counter'])
             run_experiment_other_algorithm(algorithm, env, config, exp_name, title=title)
         elif args.algo == "Deephive":
-            run_experiment(env, agent_policy, config, exp_name, save_gif=False, title=title)
+            run_experiment_concurrently(env, agent_policy, config, exp_name, save_gif=False, title=title)
         else:
             raise ValueError("algo must be either GA, PSO, SA or Deephive")
     except Exception as e:
