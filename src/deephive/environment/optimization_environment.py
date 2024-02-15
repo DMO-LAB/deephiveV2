@@ -139,6 +139,51 @@ class OptimizationEnv(gym.Env):
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
         return observation
     
+    # create a method to deepcopy the environment
+    def deepcopy(self):
+        """ Create a deep copy of the environment
+        Returns:
+            env: deep copy of the environment
+        """
+        _ = self.reset()
+        env = OptimizationEnv(self.config)
+        env.state = self.state.copy()
+        env.current_step = self.current_step
+        env.prev_state = self.prev_state.copy()
+        env.prev_agents_pos = self.prev_agents_pos.copy()
+        env.obj_values = self.obj_values.copy()
+        env.best_obj_value = self.best_obj_value
+        env.worst_obj_value = self.worst_obj_value
+        env.pbest = self.pbest.copy()
+        env.gbest = self.gbest.copy()
+        env.state_history = self.state_history.copy()
+        env.gbest_history = self.gbest_history.copy()
+        env.evaluated_points = self.evaluated_points.copy()
+        env.use_gbest = self.use_gbest
+        env.use_optimal_value = self.use_optimal_value
+        env.use_surrogate = self.use_surrogate
+        env.scaler_helper = self.scaler_helper
+        env.render_helper = self.render_helper
+        env.observation_schemes = self.observation_schemes
+        env.reward_schemes = self.reward_schemes
+        env.ep_length = self.ep_length
+        env.opt_bound = self.opt_bound
+        env.freeze = self.freeze
+        env.opt_value = self.opt_value
+        env.n_agents = self.n_agents
+        env.n_dim = self.n_dim
+        env.bounds = self.bounds
+        env.low = self.low
+        env.high = self.high
+        env.action_low = self.action_low
+        env.action_high = self.action_high
+        env.action_space = self.action_space
+        env.observation_space = self.observation_space
+        env.optimization_type = self.optimization_type
+        env.debug = self.debug
+        env.split_ratio = self.split_ratio
+        return env
+    
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
         """
         Run one time step of the environment's dynamics.
