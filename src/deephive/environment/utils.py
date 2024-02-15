@@ -90,6 +90,66 @@ class ScalingHelper:
 #         if roles is not None:
 #             self.update_roles(roles)
 #         return self.std
+# class StdController:
+#     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
+#         self.num_agents = num_agents
+#         self.n_dim = n_dim
+#         self.role_std = role_std
+#         self.decay_rate = decay_rate
+#         self.min_std = min_std
+#         self.max_std = max_std
+#         self.iteration_num = 0
+#         # Initialize std with explorer role for all dimensions and agents
+#         self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
+#         # Track decayed std for each role
+#         self.decayed_role_std = {role: std_val for role, std_val in role_std.items()}
+#         # Keep track of current roles
+#         self.current_roles = [[0] * num_agents for _ in range(n_dim)]
+
+#     def update_roles(self, roles):
+#         # Update only the std of agents whose roles have changed in each dimension
+#         for dim in range(self.n_dim):
+#             for agent_id in range(self.num_agents):
+#                 if roles[dim][agent_id] != self.current_roles[dim][agent_id]:
+#                     new_role = 'exploiter' if roles[dim][agent_id] == 1 else 'explorer'
+#                     # Use decayed std for the new role
+#                     self.std[dim][agent_id] = self.decayed_role_std[new_role]
+#             self.current_roles[dim] = roles[dim].copy()
+
+#     def decay_std(self):
+#         # Decay std based on the iteration number
+#         decay_factor = self.decay_rate ** self.iteration_num
+#         for role in self.decayed_role_std:
+#             self.decayed_role_std[role] = max(self.min_std, min(self.decayed_role_std[role] * decay_factor, self.max_std))
+#         for dim in range(self.n_dim):
+#             for agent_id in range(self.num_agents):
+#                 role = 'exploiter' if self.current_roles[dim][agent_id] == 1 else 'explorer'
+#                 # Update std with decayed std for the current role
+#                 self.std[dim][agent_id] = max(self.min_std, min(self.std[dim][agent_id] * decay_factor, self.max_std))
+#         self.iteration_num += 1
+            
+    
+#     def get_std(self, agent_id):
+#         # Get the current std for a specific agent across all dimensions
+#         return [self.std[dim][agent_id] for dim in range(self.n_dim)]
+
+#     def get_all_std(self, roles=None, std=None):
+#         # Get the current std for all agents across all dimensions
+#         if std is not None:
+#             return np.array([[std] * self.num_agents for _ in range(self.n_dim)])
+#         if roles is not None:
+#             self.update_roles(roles)
+#         return np.array(self.std)
+    
+#     def reset_std(self):
+#         # Reset std for all agents to the initial std
+#         self.std = [[self.role_std['explorer']] * self.num_agents for _ in range(self.n_dim)]
+#         self.decayed_role_std = {role: std_val for role, std_val in self.role_std.items()}
+#         self.current_roles = [[0] * self.num_agents for _ in range(self.n_dim)]
+#         self.iteration_num = 0
+
+import numpy as np
+
 class StdController:
     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
         self.num_agents = num_agents
@@ -99,56 +159,47 @@ class StdController:
         self.min_std = min_std
         self.max_std = max_std
         self.iteration_num = 0
-        # Initialize std with explorer role for all dimensions and agents
-        self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
-        # Track decayed std for each role
-        self.decayed_role_std = {role: std_val for role, std_val in role_std.items()}
-        # Keep track of current roles
-        self.current_roles = [[0] * num_agents for _ in range(n_dim)]
+        # Use NumPy array for std initialization for efficiency
+        self.std = np.full((n_dim, num_agents), role_std['explorer'])
+        self.decayed_role_std = np.array([role_std['explorer'], role_std['exploiter']])
+        # Keep track of current roles using a NumPy array
+        self.current_roles = np.zeros((n_dim, num_agents), dtype=int)
 
     def update_roles(self, roles):
-        # Update only the std of agents whose roles have changed in each dimension
-        for dim in range(self.n_dim):
-            for agent_id in range(self.num_agents):
-                if roles[dim][agent_id] != self.current_roles[dim][agent_id]:
-                    new_role = 'exploiter' if roles[dim][agent_id] == 1 else 'explorer'
-                    # Use decayed std for the new role
-                    self.std[dim][agent_id] = self.decayed_role_std[new_role]
-            self.current_roles[dim] = roles[dim].copy()
+        roles = np.array(roles)
+        # Efficiently find the indices where roles have changed
+        changed = np.where(roles != self.current_roles)
+        new_roles = roles[changed]
+        self.std[changed] = np.where(new_roles == 1, self.decayed_role_std[1], self.decayed_role_std[0])
+        self.current_roles = roles
 
     def decay_std(self):
-        # Decay std based on the iteration number
+        # Efficiently decay std values based on the role
         decay_factor = self.decay_rate ** self.iteration_num
-        for role in self.decayed_role_std:
-            self.decayed_role_std[role] = max(self.min_std, min(self.decayed_role_std[role] * decay_factor, self.max_std))
-        for dim in range(self.n_dim):
-            for agent_id in range(self.num_agents):
-                role = 'exploiter' if self.current_roles[dim][agent_id] == 1 else 'explorer'
-                # Update std with decayed std for the current role
-                self.std[dim][agent_id] = max(self.min_std, min(self.std[dim][agent_id] * decay_factor, self.max_std))
+        self.decayed_role_std = np.clip(self.decayed_role_std * decay_factor, self.min_std, self.max_std)
+        self.std = np.clip(self.std * decay_factor, self.min_std, self.max_std)
         self.iteration_num += 1
-            
-    
+
     def get_std(self, agent_id):
-        # Get the current std for a specific agent across all dimensions
-        return [self.std[dim][agent_id] for dim in range(self.n_dim)]
+        # Efficient retrieval of std values for a specific agent across all dimensions
+        return self.std[:, agent_id]
 
     def get_all_std(self, roles=None, std=None):
-        # Get the current std for all agents across all dimensions
         if std is not None:
-            return np.array([[std] * self.num_agents for _ in range(self.n_dim)])
+            # Return a custom std value if specified
+            return np.full((self.n_dim, self.num_agents), std)
         if roles is not None:
             self.update_roles(roles)
-        return np.array(self.std)
-    
+        return self.std
+
     def reset_std(self):
-        # Reset std for all agents to the initial std
-        self.std = [[self.role_std['explorer']] * self.num_agents for _ in range(self.n_dim)]
-        self.decayed_role_std = {role: std_val for role, std_val in self.role_std.items()}
-        self.current_roles = [[0] * self.num_agents for _ in range(self.n_dim)]
+        # Efficiently reset std values for all agents
+        self.std.fill(self.role_std['explorer'])
+        self.decayed_role_std = np.array([self.role_std['explorer'], self.role_std['exploiter']])
+        self.current_roles.fill(0)
         self.iteration_num = 0
 
-    
+
 
 def parse_config(file_path: str) -> dict:
     """
