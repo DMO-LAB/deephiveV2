@@ -63,24 +63,32 @@ def print_items(**kwargs):
     for key, value in kwargs.items():
         print(key, value)
         
-        
+
 def get_action(observation_info, agent_policy, env, observation_std=None):
+    # Ensure observation_info is a numpy array
     observation = observation_info
-    # enforce observation_std to be a numpy array
+    if not isinstance(observation, np.ndarray):
+        observation = np.array(observation)
+        assert observation.shape[0] == env.n_dim, "Observation must have the same number of dimensions as the environment"
+
+    # Initialize observation_std with zeros or use provided std, ensuring it matches the shape of observation
     if observation_std is None:
         observation_std = np.zeros_like(observation)
     else:
         observation_std = np.array(observation_std)
-    actions = np.zeros((env.n_agents, env.n_dim))
-    for dim in range(env.n_dim):
-        observation[dim] = observation[dim]#.astype(np.float32)
-        if observation_std is not None:
-            observation_std[dim] = observation_std[dim]#.astype(np.float32) 
-        else:
-            observation_std[dim] = np.zeros_like(observation[dim])
-        action = agent_policy.select_action(observation[dim], observation_std[dim])
-        actions[:, dim] = action
-    return actions
+
+    # Convert observations and stds to the appropriate format (Flatten if necessary)
+    # Assuming observation and observation_std are 2D arrays of shape (n_agents, n_dim)
+    # Flatten observation and observation_std for processing
+    observation_flat = observation.reshape(env.n_agents * env.n_dim, -1)  # Flatten to 1D array
+    observation_std_flat = observation_std.reshape(-1)  # Flatten to 1D array
+    # Pass the entire flattened observation and std arrays to select_action
+    action_flat = agent_policy.select_action(observation_flat, observation_std_flat)
+
+    # Reshape the flattened action array back to the original (n_agents, n_dim) shape
+    actions = action_flat.reshape(env.n_agents, env.n_dim)
+
+    return actions  # Return the action
 
 
 def select_candidate_points(grid_points, evaluated_points, n_select):
