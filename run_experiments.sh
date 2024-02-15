@@ -3,8 +3,8 @@
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
 ITERS=100
-ACTION_STD=0.02
-DECAY_RATE=0.995
+ACTION_STD=0.03
+DECAY_RATE=0.99
 DECAY_START=5
 TOL=0.99
 W=0.7
@@ -12,7 +12,7 @@ C1=0.8
 C2=0.5
 SPLIT_INTERVAL=5
 function_end=29
-n_dims=(2 10 20 30 50 100) # Changed to bash array syntax
+n_dims=(10) # Changed to bash array syntax
 
 # Loop over each dimension in n_dims
 for n_dim in "${n_dims[@]}"
@@ -42,7 +42,7 @@ do
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
         python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --freeze --role_std_exploiters 0.5 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --decay_std --decay_start 15 --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim
 
-        # Experiment 5: SPLITTING - WITH STDs
+        Experiment 5: SPLITTING - WITH STDs
         EXP_NUM=$((EXP_NUM+1))
         exp_list="$exp_list,$EXP_NUM"
         TITLE="SPLITTING-WITH STDs"
@@ -54,7 +54,7 @@ do
         exp_list="$exp_list,$EXP_NUM"
         TITLE="SPLITTING-WITH STDs - Dynamic-split"
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
-        python $SCRIPT_NAME --title "$TITLE" --function_id $function_id --exp_num $EXP_NUM --use_gbest --freeze --role_std_exploiters 0.02 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --split_interval $SPLIT_INTERVAL --use_split_interval --n_dim $n_dim
+        python $SCRIPT_NAME --title "$TITLE" --function_id $function_id --exp_num $EXP_NUM --use_gbest --freeze --role_std_exploiters 0.02 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --split_interval $SPLIT_INTERVAL --use_split_interval --n_dim $n_dim --dynamic_split
 
         # Experiment 7: SPLITTING - TWO POLICIES
         EXP_NUM=$((EXP_NUM+1))
