@@ -404,14 +404,12 @@ if __name__ == "__main__":
         print(f"[ERROR] - Hybrid function {config['function_id']} is not supported for n_dim <= 2")
         sys.exit(1)
         
-    # if config["n_dim"] == 2:
-    #     config["n_agents"] = 10
-    # elif config["n_dim"] == 50:
-    #     config["n_agents"] = 60
-    # elif config["n_dim"] == 100:
-    #     config["n_agents"] = 100
-    # else:
-    #     config["n_agents"] = 50
+    if config["n_dim"] == 2:
+        config["n_agents"] = 20
+    elif config["n_dim"] == 50:
+        config["n_agents"] = 100
+    else:
+        config["n_agents"] = 50
         
     exp_name = "exp_" + str(args.exp_num)
     result_path = f'experiments/results_{config["n_dim"]}/' + str(exp_name) + '/' 
