@@ -2,14 +2,14 @@
 
 # Common variables
 SCRIPT_NAME="experiments/run_experiment3.py"
-ITERS=100
-ACTION_STD=0.03
-DECAY_RATE=0.99
-DECAY_START=5
+ITERS=20
+ACTION_STD=0.005
+DECAY_RATE=0.999
+DECAY_START=1000
 TOL=0.99
-W=0.7
-C1=0.8
-C2=0.5
+W=1
+C1=2
+C2=2
 SPLIT_INTERVAL=5
 function_end=29
 n_dims=(10) # Changed to bash array syntax
@@ -31,23 +31,23 @@ do
 
         # Experiment 1: NO SPLITTING - UNFREEZE
         exp_list="$exp_list,$EXP_NUM"
-        TITLE="NO SPLITTING-UNFREEZE"
+        TITLE="NO SPLITTING-FREEZE"
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
-        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.5 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --decay_std --decay_start $DECAY_START --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim
+        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.5 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --decay_std --decay_start $DECAY_START --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim --freeze
 
         # Experiment 3: NO SPLITTING - DELAYED DECAY
         EXP_NUM=$((EXP_NUM+1))
         exp_list="$exp_list,$EXP_NUM"
         TITLE="NO SPLITTING-DELAYED DECAY-FREEZE"
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
-        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --freeze --role_std_exploiters 0.5 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --decay_std --decay_start 15 --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim
+        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --freeze --role_std_exploiters 0.5 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --decay_std --decay_start 2500 --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim --freeze
 
         Experiment 5: SPLITTING - WITH STDs
         EXP_NUM=$((EXP_NUM+1))
         exp_list="$exp_list,$EXP_NUM"
         TITLE="SPLITTING-WITH STDs"
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
-        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.03 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim
+        python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.03 --role_std_explorers 0.5 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_stds" --plot_gbest --iters $ITERS --tol $TOL --function_id $function_id --n_dim $n_dim --freeze
 
         # Experiment with dynamic split
         EXP_NUM=$((EXP_NUM+1))
@@ -63,12 +63,12 @@ do
         echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
         python $SCRIPT_NAME --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.4 --role_std_explorers 0.4 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_two_policies" --plot_gbest --iters $ITERS --tol $TOL --exploit_std 0.03 --function_id $function_id --n_dim $n_dim
 
-        # Dynamic split version of TWO POLICIES
-        EXP_NUM=$((EXP_NUM+1))
-        exp_list="$exp_list,$EXP_NUM"
-        TITLE="SPLITTING-TWO POLICIES - Dynamic-split"
-        echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
-        python $SCRIPT_NAME --function_id $function_id --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.4 --role_std_explorers 0.4 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_two_policies" --plot_gbest --iters $ITERS --tol $TOL --exploit_std 0.03 --dynamic_split --split_interval $SPLIT_INTERVAL --use_split_interval --n_dim $n_dim
+        # # Dynamic split version of TWO POLICIES
+        # EXP_NUM=$((EXP_NUM+1))
+        # exp_list="$exp_list,$EXP_NUM"
+        # TITLE="SPLITTING-TWO POLICIES - Dynamic-split"
+        # echo "Running experiment $EXP_NUM: $TITLE for function_id $function_id"
+        # python $SCRIPT_NAME --function_id $function_id --title "$TITLE" --exp_num $EXP_NUM --role_std_exploiters 0.4 --role_std_explorers 0.4 --variable_std --action_std $ACTION_STD --decay_rate $DECAY_RATE --split_agents --split_type "use_two_policies" --plot_gbest --iters $ITERS --tol $TOL --exploit_std 0.03 --dynamic_split --split_interval $SPLIT_INTERVAL --use_split_interval --n_dim $n_dim
 
         # PSO Experiment
         EXP_NUM=$((EXP_NUM+1))

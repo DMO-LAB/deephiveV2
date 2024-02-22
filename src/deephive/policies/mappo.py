@@ -232,7 +232,7 @@ class MAPPO:
         action, action_logprob = self.policy.act(state, std_obs)
         if self.pretrained:
             return action.detach().cpu().numpy().flatten()
-        for i in range(self.n_agents):
+        for i in range(len(state)):
             self.buffer.states.append(state[i])
             self.buffer.std_obs.append(std_obs[i])
             self.buffer.actions.append(action[i])

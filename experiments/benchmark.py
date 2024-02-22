@@ -15,7 +15,7 @@ parser.add_argument("--n_dim", type=int, default=2)
 
 args = parser.parse_args()
 
-result_path = f"experiments/results_{args.n_dim}/"
+result_path = f"experiments/results/results_{args.n_dim}/"
 
 exp_list = [i for i in range(0, 29)]
 
@@ -25,7 +25,7 @@ for exp in exp_list:
         exp_path = os.path.join(result_path, f"result_comparison_function_{exp}.csv")
         df = pd.read_csv(exp_path)
         # keep only the first 2 and rhe last row of the dataframe
-        #df = df.iloc[[0, 1, -1]]
+        df = df.iloc[[0, 1, -1]]
         # do  not add empty dataframes
         if not df.empty:
             dfs.append(df)
@@ -62,13 +62,22 @@ def create_benchmark_tables(dfs):
 
     # Reset index name
     combined_df.index.name = 'Function'
-
-    def highlight_max(s):
-        '''
-        highlight the maximum in a Series yellow.
-        '''
-        is_max = s == s.max()
-        return ['background-color: red' if v else '' for v in is_max]
+    
+    def highlight_top3(s):
+        """
+        Highlight the first, second, and third minimum in a Series.
+        """
+        # Ensure numeric values and drop NaNs for accurate comparison
+        numeric_s = pd.to_numeric(s, errors='coerce').dropna()
+        if numeric_s.empty:
+            return ['' for _ in s]
+        min_vals = numeric_s.nsmallest(3)
+        # Use different colors for first, second, and third minimum
+        colors = {min_vals.index[0]: 'background-color: green',
+                min_vals.index[1]: 'background-color: red'
+                #min_vals.index[2]: 'background-color: blue'
+                }
+        return [colors.get(i, '') for i in s.index]
 
     def highlight_min(s):
         '''
@@ -78,13 +87,13 @@ def create_benchmark_tables(dfs):
         return ['background-color: green' if v else '' for v in is_min]
 
     # Step 4: Display the combined DataFrame
-    return combined_df.style.apply(highlight_min, axis=1)
+    return combined_df.style.apply(highlight_top3, axis=1).apply(highlight_min, axis=1)
 
 
 try:
     result_comparison = create_benchmark_tables(dfs)
     # save the result_comparison
-    result_comparison.to_excel(f"{result_path}result_comparison_function_sp.xlsx")
+    result_comparison.to_excel(f"{result_path}result_comparison_function_no_split.xlsx")
 except Exception as e:
     print("Error creating the benchmark tables")
     print(e)

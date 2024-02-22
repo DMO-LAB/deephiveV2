@@ -11,7 +11,6 @@ from deephive.environment.utils import parse_config, ScalingHelper, Render, filt
 from deephive.environment.utils import initialize_grid
 from deephive.exploration.gp_surrogate import GPSurrogateModule
     
-    
 class OptimizationEnv(gym.Env):
     def __init__(self, config: Dict[str, Any]):
         """
@@ -48,6 +47,7 @@ class OptimizationEnv(gym.Env):
         """
         self.config = config
         self.setup_config()
+        self._reset_variables()
         
     def setup_config(self):
         # Configuration code from the original __init__ method
@@ -112,7 +112,8 @@ class OptimizationEnv(gym.Env):
     def __str__(self):
         return f"OptimizationEnv: {self.env_name} with {self.n_agents} agents in {self.n_dim} dimensions"
     
-    def reset(self):
+    
+    def reset(self, **kwargs):
         self.current_step = 0
         self._reset_variables()
         self.state = self._generate_init_state()
@@ -122,7 +123,7 @@ class OptimizationEnv(gym.Env):
         self.pbest = self._get_actual_state()
         self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
         self._update_pbest()
-        # self.surrogate_states_buffer = []
+    
         if self.config["use_grid"]:
             self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim) 
             # scale the grid points
@@ -137,7 +138,10 @@ class OptimizationEnv(gym.Env):
         
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
+        observation, observation_std = observation
+        observation = np.array(observation).reshape(self.n_agents*self.n_dim, -1)
         return observation
+    
     
     # create a method to deepcopy the environment
     def deepcopy(self):
@@ -219,8 +223,16 @@ class OptimizationEnv(gym.Env):
         self._update_pbest()
         self._update_done_flag()
 
+        if self.use_optimal_value and self.gbest[-1] == self.opt_value:
+            truncated = True
+        else:
+            truncated = False
         self.evaluated_points = np.vstack((self.evaluated_points, self.state[:, :-1])).copy() # scaled points
         agents_done = np.array([self.done for _ in range(self.n_agents)])
+        # repeat done for all dimensions and then flatten to 1D array of length n_agents*n_dim
+        agents_done = agents_done.repeat(self.n_dim).reshape(self.n_agents, self.n_dim).flatten()
+        
+        
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
@@ -234,8 +246,9 @@ class OptimizationEnv(gym.Env):
         elif self.optimization_type == "maximize":
             if np.any(self.obj_values > self.best_obj_value):
                 raise ValueError("Objective value is less than the best objective value")
-        
-        return observation, reward, agents_done, info
+        observation, observation_std = observation
+        observation = np.array(observation).reshape(self.n_agents*self.n_dim, -1)
+        return observation, reward, agents_done, truncated, info
 
     
     def render(self, type: str = "state",fps=1, file_path: Optional[str] = None):
@@ -306,21 +319,21 @@ class OptimizationEnv(gym.Env):
         if self.current_step >= self.ep_length:
             self.done = True
             #print(f"Reached maximum episode length: {self.ep_length}")
-        elif self.optimization_type == "minimize" and self.opt_value is not None:
-            # if the best objective value is less than the optimal value
-            if self.best_obj_value <= self.opt_value + self.opt_bound:
-                self.done = True
-                #print(f"Best objective value: {self.best_obj_value} is less than the optimal value: {self.opt_value}, within the bound: {self.opt_bound}")
-            else:
-                self.done = False
+        # elif self.optimization_type == "minimize" and self.opt_value is not None:
+        #     # if the best objective value is less than the optimal value
+        #     if self.best_obj_value <= self.opt_value + self.opt_bound:
+        #         self.done = True
+        #         #print(f"Best objective value: {self.best_obj_value} is less than the optimal value: {self.opt_value}, within the bound: {self.opt_bound}")
+        #     else:
+        #         self.done = False
             
-        elif self.optimization_type == "maximize" and self.opt_value is not None:
-            # if the best objective value is greater than the optimal value
-            if self.best_obj_value >= self.opt_value - self.opt_bound:
-                self.done = True
-                #print(f"Best objective value: {self.best_obj_value} is greater than the optimal value: {self.opt_value}")
-            else:
-                self.done = False
+        # elif self.optimization_type == "maximize" and self.opt_value is not None:
+        #     # if the best objective value is greater than the optimal value
+        #     if self.best_obj_value >= self.opt_value - self.opt_bound:
+        #         self.done = True
+        #         #print(f"Best objective value: {self.best_obj_value} is greater than the optimal value: {self.opt_value}")
+        #     else:
+        #         self.done = False
         else:
             self.done = False
             

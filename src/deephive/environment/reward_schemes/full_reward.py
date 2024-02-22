@@ -26,8 +26,8 @@ class FullRewardScheme(RewardScheme):
         # give agents that improved an additional reward of 1
         reward[reward < 0] -= 3
         # add the inverse of the distance between the agents and the best agent (the best agent has a value of 1)
-        reward +=  self.env.state[:, -1]
-        reward = self._post_process_rewards(reward)
+        # reward +=  self.env.state[:, -1]
+        # reward = self._post_process_rewards(reward)
         reward += -np.log(1 - self.env.state[:, -1] + 0.001)
         return reward
     

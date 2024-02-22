@@ -8,6 +8,7 @@ test.png
 benchmarking_runs
 testing_runs
 training_runs
+benchmark_results/
 .env
 Haresh_Experiment
 .neptune

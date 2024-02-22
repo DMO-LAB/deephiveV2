@@ -231,7 +231,9 @@ class CEC17(OptimizationFunctionBase):
         self.negative = negative
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        return all_functions[self.function_id](params, negative=self.negative)
+        z = all_functions[self.function_id](params, negative=self.negative)
+        self.tracker(z)
+        return z
 
     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
         return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
