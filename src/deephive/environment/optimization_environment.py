@@ -73,6 +73,8 @@ class OptimizationEnv(gym.Env):
             self.debug = self.config["debug"] if "debug" in self.config else False
             self.grid_resolution = self.config["grid_resolution"] if "grid_resolution" in self.config else 0.1
             self.split_ratio = self.config["split_ratio"] if "split_ratio" in self.config else 0.5  
+            self.log_scale = self.config["log_scale"] if "log_scale" in self.config else False
+            self.include_gbest = self.config["include_gbest"] if "include_gbest" in self.config else False
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -135,7 +137,7 @@ class OptimizationEnv(gym.Env):
             _, self.agents_pos_std = self.surrogate.evaluate(actual_samples[:, :-1], scale=True)
             self.prev_agents_pos_std = self.agents_pos_std.copy()
         
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, include_gbest=self.include_gbest)
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
         return observation
     
@@ -224,7 +226,7 @@ class OptimizationEnv(gym.Env):
         agents_done = np.array([self.done for _ in range(self.n_agents)])
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio)
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, include_gbest=self.include_gbest)
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
 
         info = self._get_info()
@@ -400,7 +402,10 @@ class OptimizationEnv(gym.Env):
         self.state[:, :-1] = self.scaler_helper.scale(
             self.state[:, :-1], self.min_pos, self.max_pos)
         self.state[:, -1] = self.scaler_helper.scale(
-            self.obj_values, self.worst_obj_value, self.best_obj_value)
+            self.obj_values, self.worst_obj_value, self.best_obj_value, log_scale=self.log_scale)
+        # print(f"Best objective value: {self.best_obj_value} - Worst objective value: {self.worst_obj_value}")
+        # print(f"Objective values: {self.obj_values}")
+        # print(f"state: {self.state}")   
         
         # assert that the normalized state is within the bounds [0, 1]
         assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"

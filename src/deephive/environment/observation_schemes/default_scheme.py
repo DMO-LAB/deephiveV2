@@ -6,7 +6,7 @@ scaler = ScalingHelper()
 
 class DefaultObservationScheme(ObservationScheme):
     
-    def generate_observation(self, pbest, use_gbest=False, std_type="euclidean", ratio=0.5):
+    def generate_observation(self, pbest, use_gbest=False, std_type="euclidean", ratio=0.5, include_gbest=False):
         pbest[:, :-1] = scaler.scale(pbest[:, :-1], self.env.min_pos, self.env.max_pos)
         pbest[:, -1] = scaler.scale(pbest[:, -1], self.env.worst_obj_value, self.env.best_obj_value)
         if self.env.optimization_type == "minimum":
@@ -22,7 +22,7 @@ class DefaultObservationScheme(ObservationScheme):
             std = self._calculate_std(agent, gbest, std_type)
 
             for dim in range(self.env.n_dim):
-                obs_values = self._get_obs_for_dim(agent, agent_nb, dim, pbest, gbest, use_gbest)
+                obs_values = self._get_obs_for_dim(agent, agent_nb, dim, pbest, gbest, use_gbest, include_gbest)
                 agent_obs[dim].append(np.array([obs_values]))
                 std_obs[dim].append(std)
 
@@ -91,7 +91,7 @@ class DefaultObservationScheme(ObservationScheme):
         else:
             return abs(gbest - self.env.state[agent])
 
-    def _get_obs_for_dim(self, agent, agent_nb, dim, pbest, gbest, use_gbest):
+    def _get_obs_for_dim(self, agent, agent_nb, dim, pbest, gbest, use_gbest, include_gbest=False):
         obs = [ 
                 self.env.state[agent][self.env.n_dim],
                 (self.env.state[agent][dim] - self.env.prev_state[agent][dim]),
@@ -103,6 +103,9 @@ class DefaultObservationScheme(ObservationScheme):
                 (self.env.state[agent][dim] - pbest[agent_nb][dim]),
                 (self.env.state[agent][self.env.n_dim] - pbest[agent_nb][self.env.n_dim]),
         ]
+        if include_gbest:
+            obs.append(self.env.state[agent][dim] - gbest[dim])
+            obs.append(self.env.state[agent][self.env.n_dim] - gbest[self.env.n_dim])
         if use_gbest: 
             # replace the third and fourth elements with the distance to gbest
             obs[3] = self.env.state[agent][dim] - gbest[dim]

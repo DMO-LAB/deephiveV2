@@ -2,7 +2,7 @@ import numpy as np
 from deephive.environment.reward_schemes import RewardScheme
 
 class FullRewardScheme(RewardScheme):
-    def __init__(self, env, stuck_reward=-1, optimal_reward=10, frozen_best_reward=0):
+    def __init__(self, env, stuck_reward=-1, optimal_reward=20, frozen_best_reward=0):
         super().__init__(env)
         self.stuck_reward = stuck_reward
         self.optimal_reward = optimal_reward
@@ -26,8 +26,8 @@ class FullRewardScheme(RewardScheme):
         # give agents that improved an additional reward of 1
         reward[reward < 0] -= 3
         # add the inverse of the distance between the agents and the best agent (the best agent has a value of 1)
-        # reward +=  self.env.state[:, -1]
-        # reward = self._post_process_rewards(reward)
+        reward +=  self.env.state[:, -1]
+        reward += self._post_process_rewards(reward)
         reward += -np.log(1 - self.env.state[:, -1] + 0.001)
         return reward
     
@@ -58,5 +58,9 @@ class FullRewardScheme(RewardScheme):
         # Freeze best agent
         if self.env.freeze:
             reward[self.env.best_agent] =+ self.frozen_best_reward
+            
+        if self.env.current_step >= self.env.ep_length - 1:
+            # reward the optimal agents with the best reward
+            reward[optimal_agents] += self.optimal_reward
         
         return reward

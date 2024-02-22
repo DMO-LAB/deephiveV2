@@ -20,7 +20,7 @@ class ScalingHelper:
     A class that provides methods for scaling and rescaling values.
     """
     @staticmethod
-    def scale(d, d_min, d_max):
+    def scale(d, d_min, d_max, log_scale=False):
         """
         Scales a value between 0 and 1 based on the given minimum and maximum values.
 
@@ -33,14 +33,22 @@ class ScalingHelper:
             float: The scaled value between 0 and 1.
         """
         
+        if log_scale:
+            d = np.log10(-d)
+            d_min_modifies = np.log10(-d_max)
+            d_max_modifies = np.log10(-d_min)
+            d_min = d_min_modifies
+            d_max = d_max_modifies
         # ensure that the values has the same decimal precision
         scaled_d = (d - d_min) / ((d_max - d_min) + 1e-10)
         # ROUND THE VALUE TO 4 DECIMAL PLACES
         scaled_d = np.round(scaled_d, 4)
+        if log_scale:
+            scaled_d = 1 - scaled_d
         return scaled_d
         
     @staticmethod
-    def rescale(d, d_min, d_max):
+    def rescale(d, d_min, d_max, log_scale=False):
         """
         Rescales a value between the given minimum and maximum values to its original range.
 
@@ -52,8 +60,13 @@ class ScalingHelper:
         Returns:
             float: The rescaled value between d_min and d_max.
         """
+        if log_scale:
+            d = -10**(1-d)
+            d_min = np.log10(-d_max)
+            d_max = np.log10(-d_min)
         
         rescaled_d = d_min + (d_max - d_min) * d
+
         return rescaled_d
     
 

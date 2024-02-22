@@ -4,6 +4,7 @@
     "n_dim":2,
     "function_id":1,
     "ep_length": 5000,
+    "include_gbest": true,
     "init_state": null,
     "opt_bound": 0.9,
     "reward_type": "full",

@@ -239,7 +239,7 @@ class CEC17(OptimizationFunctionBase):
         return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
     
     def optimal_value(self, dim) -> float:
-        return None
+        return -100 * (self.function_id+1)  # 100 * (i+1) where i is the function_id
     
     def __str__(self):
         return f"CEC17 Function {self.function_id}"
