@@ -79,36 +79,32 @@ class OptimizationEnv(gym.Env):
             raise KeyError(f"Key {e} not found in config file.")
 
     def _reset_variables(self):
-        self.state_history = np.zeros(
-            (self.n_agents, self.ep_length+1, self.n_dim+3))
+        self.state_history = np.zeros((self.n_agents, self.ep_length+1, self.n_dim+3))
         self.gbest_history = np.zeros((self.ep_length+1, self.n_dim+1))
         self.best_obj_value = np.inf if self.optimization_type == "minimize" else -np.inf
         if self.use_optimal_value:
             self.best_obj_value = self.opt_value
         self.worst_obj_value = -np.inf if self.optimization_type == "minimize" else np.inf
+
+        # Use bounds directly for min_pos and max_pos, no change needed here
         self.min_pos, self.max_pos = self.bounds[0], self.bounds[1]
-        self.lower_bound_actions = np.array(
-            [-np.inf for _ in range(self.n_dim)], dtype=np.float64)
-        self.upper_bound_actions = np.array(
-            [np.inf for _ in range(self.n_dim)], dtype=np.float64)
-        self.lower_bound_obs = np.append(np.array(
-            [self.min_pos[i] for i in range(self.n_dim)], dtype=np.float64), -np.inf)
-        self.upper_bound_obs = np.append(np.array(
-            [self.max_pos[i] for i in range(self.n_dim)], dtype=np.float64), np.inf)
 
-        self.low = np.array([self.lower_bound_obs.tolist()
-                            for _ in range(self.n_agents)])
-        self.high = np.array([self.upper_bound_obs.tolist()
-                             for _ in range(self.n_agents)])
-        self.action_low = np.array(
-            [self.lower_bound_actions.tolist() for _ in range(self.n_agents)], dtype=np.float64)
-        self.action_high = np.array(
-            [self.upper_bound_actions.tolist() for _ in range(self.n_agents)], dtype=np.float64)
+        # Vectorized bounds for actions
+        self.lower_bound_actions = np.full(self.n_dim, -np.inf, dtype=np.float64)
+        self.upper_bound_actions = np.full(self.n_dim, np.inf, dtype=np.float64)
 
-        self.action_space = spaces.Box(
-            low=self.action_low, high=self.action_high, dtype=np.float64) 
-        self.observation_space = spaces.Box(
-            low=self.low, high=self.high, dtype=np.float64) 
+        # Efficiently create lower and upper bounds for observations
+        self.lower_bound_obs = np.concatenate((self.min_pos, [-np.inf]))
+        self.upper_bound_obs = np.concatenate((self.max_pos, [np.inf]))
+
+        # Broadcasting to create agent-specific bounds without explicit loops
+        self.low = np.tile(self.lower_bound_obs, (self.n_agents, 1))
+        self.high = np.tile(self.upper_bound_obs, (self.n_agents, 1))
+        self.action_low = np.tile(self.lower_bound_actions, (self.n_agents, 1))
+        self.action_high = np.tile(self.upper_bound_actions, (self.n_agents, 1))
+
+        self.action_space = spaces.Box(low=self.action_low, high=self.action_high, dtype=np.float64)
+        self.observation_space = spaces.Box(low=self.low, high=self.high, dtype=np.float64)
 
     def __str__(self):
         return f"OptimizationEnv: {self.env_name} with {self.n_agents} agents in {self.n_dim} dimensions"
@@ -223,7 +219,7 @@ class OptimizationEnv(gym.Env):
         self._update_done_flag()
 
         self.evaluated_points = np.vstack((self.evaluated_points, self.state[:, :-1])).copy() # scaled points
-        agents_done = np.array([self.done for _ in range(self.n_agents)])
+        agents_done = np.zeros(self.n_agents, dtype=bool) if not self.done else np.ones(self.n_agents, dtype=bool)
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
         observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, include_gbest=self.include_gbest)
@@ -403,9 +399,6 @@ class OptimizationEnv(gym.Env):
             self.state[:, :-1], self.min_pos, self.max_pos)
         self.state[:, -1] = self.scaler_helper.scale(
             self.obj_values, self.worst_obj_value, self.best_obj_value, log_scale=self.log_scale)
-        # print(f"Best objective value: {self.best_obj_value} - Worst objective value: {self.worst_obj_value}")
-        # print(f"Objective values: {self.obj_values}")
-        # print(f"state: {self.state}")   
         
         # assert that the normalized state is within the bounds [0, 1]
         assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"
@@ -429,36 +422,44 @@ class OptimizationEnv(gym.Env):
         
         self.state_history[:, self.current_step, :self.n_dim+1] = self._get_actual_state()
 
-    def _get_stuck_agents(self, threshold: int = 2) -> List[int]:
+
+    def _get_stuck_agents(self, threshold: int = 2) -> np.ndarray:
         """
         Check if agents are stuck in a local minimum by comparing the objective values
         in state_history for the past 'threshold' time steps.
-        
+
         Args:
             threshold: number of previous steps to check
-        
+
         Returns:
-            stuck_agents: list of agents that are stuck
+            stuck_agents: numpy array of agents that are stuck
         """
         # Ensure the threshold is at least 1 to prevent negative indexing
         threshold = max(1, threshold)
         
+        # Check if there's enough history to compare, otherwise return empty array
+        if self.current_step < 3 or self.current_step < threshold:
+            return np.array([])
+        
         # Determine the range of steps to check in the state_history
         start_step = max(0, self.current_step - threshold)
         end_step = self.current_step
-        
-        # List to hold the indices of stuck agents
-        stuck_agents = []
-        if self.current_step > 3:
-            for agent in range(self.n_agents):
-                # Get the objective values from state_history for the specified range of steps
-                past_obj_values = self.state_history[agent, start_step:end_step, -3]
-                # Check if the objective values have not changed over the threshold time steps
-                if np.all(past_obj_values == past_obj_values[0]) and agent != self.best_agent:
-                    stuck_agents.append(agent)
-        
-        # if len(stuck_agents) > 1:
-        #     print(f"{len(stuck_agents)} agents are stuck - {stuck_agents} at step {self.current_step}")
+
+        # Extract the relevant slice of state_history for all agents, focusing on the objective value
+        past_obj_values = self.state_history[:, start_step:end_step, -3]
+
+        # Check if the objective values have not changed over the threshold time steps for each agent
+        # This is done by checking if the standard deviation along the time axis (axis=1) is 0
+        # Meaning the values have not changed
+        unchanged_values = np.all(past_obj_values == past_obj_values[:, [0]], axis=1)
+
+        # Exclude the best agent from being considered stuck
+        if hasattr(self, 'best_agent'):
+            unchanged_values[self.best_agent] = False
+
+        # Find the indices (agent numbers) where values have not changed
+        stuck_agents = np.where(unchanged_values)[0]
+
         return stuck_agents
 
 

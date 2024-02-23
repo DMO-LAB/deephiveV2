@@ -86,7 +86,7 @@ def get_action(observation_info, agent_policy, env, observation_std=None):
     action_flat = agent_policy.select_action(observation_flat, observation_std_flat)
 
     # Reshape the flattened action array back to the original (n_agents, n_dim) shape
-    actions = action_flat.reshape(env.n_agents, env.n_dim)
+    actions = action_flat.reshape(env.n_dim, env.n_agents).T
 
     return actions  # Return the action
 

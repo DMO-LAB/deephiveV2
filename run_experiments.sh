@@ -11,7 +11,7 @@ W=1
 C1=2
 C2=2
 SPLIT_INTERVAL=250
-function_end=29
+function_end=10
 n_dims=(2) # Changed to bash array syntax
 
 # Loop over each dimension in n_dims
