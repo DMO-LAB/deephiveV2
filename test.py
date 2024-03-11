@@ -87,7 +87,7 @@ for i, model in enumerate(model_experiments):
         config["use_lbest"] = True
     else:
         config["use_lbest"] = False
-    MODEL_PATH = f"notebooks/training_results/experiment_{model}/policy-4800.pth"
+    MODEL_PATH = f"models/model_{model}_policy-4800.pth"
 
     title = f"experiment_{model}"
     save_dir = base_save_dir + f"model{model}/"
