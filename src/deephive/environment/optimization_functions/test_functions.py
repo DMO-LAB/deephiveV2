@@ -5,7 +5,7 @@ from deephive.environment.commons.objective_functions import sphere_function, co
 from typing import Tuple, Callable, Dict, Any
 import sys 
 # from deephive.environment.optimization_functions.cec2017 import functions
-from cec2017.functions import all_functions
+# from cec2017.functions import all_functions
 from deephive.environment.optimization_functions.benchmark_functions import *
 # all_functions = functions.all_functions
 
