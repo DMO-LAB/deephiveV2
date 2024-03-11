@@ -225,25 +225,25 @@ class GaussianPeakFunction(OptimizationFunctionBase):
         return "Gaussian Peak Function"
     
     
-class CEC17(OptimizationFunctionBase):
-    def __init__(self, function_id: int, negative: bool = True, **kwargs):
-        self.tracker = Tracker()
-        self.function_id = function_id
-        self.negative = negative
+# class CEC17(OptimizationFunctionBase):
+#     def __init__(self, function_id: int, negative: bool = True, **kwargs):
+#         self.tracker = Tracker()
+#         self.function_id = function_id
+#         self.negative = negative
 
-    def evaluate(self, params: np.ndarray) -> np.ndarray:
-        z = -all_functions[self.function_id](params)
-        self.tracker(z)
-        return z
+#     def evaluate(self, params: np.ndarray) -> np.ndarray:
+#         z = -all_functions[self.function_id](params)
+#         self.tracker(z)
+#         return z
 
-    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
-        return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
+#     def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+#         return np.array([-100 for _ in range(dim)]), np.array([100 for _ in range(dim)])
     
-    def optimal_value(self, dim) -> float:
-        return -100 * (self.function_id+1)  # 100 * (i+1) where i is the function_id
+#     def optimal_value(self, dim) -> float:
+#         return -100 * (self.function_id+1)  # 100 * (i+1) where i is the function_id
     
-    def __str__(self):
-        return f"CEC17 Function {self.function_id}"
+#     def __str__(self):
+#         return f"CEC17 Function {self.function_id}"
     
 
 class BenchmarkFunctions(OptimizationFunctionBase):
