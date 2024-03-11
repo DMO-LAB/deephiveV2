@@ -26,6 +26,7 @@ config['use_gbest'] = False
 config['use_lbest'] = False
 config["use_optimal_value"] = True
 config["log_scale"] = True
+config["freeze"] = False
 config["include_gbest"] = False
 config["negative"] = True
 if config["include_gbest"] or config["use_lbest"]:
@@ -93,6 +94,7 @@ for i, model in enumerate(model_experiments):
     save_dir = base_save_dir + f"model{model}/"
     tags = f"testing with 40 agents and log scale"
     neptune_logger = None#initialize_logger(api_token, title, config, mode="test")
+    # function_ids, iters, save_dir, model_path, config, **kwargs
     successful_functions, save_dir = run_test_deephive(function_ids, iters, save_dir, MODEL_PATH, config, neptune_logger=neptune_logger)
     if neptune_logger:
         neptune_logger.stop()

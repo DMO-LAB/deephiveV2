@@ -152,11 +152,11 @@ def test(env, agent_policy, iters, decay_start=100, decay_rate=0.995,
             if neptune_logger:
                 neptune_logger[f"test/{function_id}/Episode_{iter}/gbest_values"].log(env.gbest[-1])
             if step >= decay_start:
-                print(f"Decaying action std at step {step}")
+                #print(f"Decaying action std at step {step}")
                 # Decay the std uniformly from the max to the min std over the specified rate
                 current_action_std = max(min_action_std, current_action_std * decay_rate)
                 agent_policy.set_action_std(current_action_std)   
-                print(f"Current action std: {current_action_std}")
+                #print(f"Current action std: {current_action_std}")
         if env.n_dim == 2 and save_gif:
             env.render(type="history", file_path=f"{save_path}/episode_{iter}.gif") 
             if neptune_logger:
@@ -267,8 +267,8 @@ def run_test_deephive(function_ids, iters, save_dir, model_path, config, **kwarg
             
             try:
                 test_save_path = f"{save_dir}/deephive/{function_id}"
-                all_gbest_vals = test(env, agent_policy, iters, decay_start=10, decay_rate=0.9, 
-                                min_action_std=0.0001, max_action_std=0.5, 
+                all_gbest_vals = test(env, agent_policy, iters, decay_start=config["test_decay_start"], decay_rate=config["test_decay_rate"],
+                                min_action_std=config["min_action_std"], max_action_std=config["max_action_std"],
                                 save_gif = False, save_path = test_save_path, function_id=function_id, neptune_logger=neptune_logger)
                 plot_individual_function_evaluation(all_gbest_vals, config["n_agents"], f"{test_save_path}/{function_id}_individual.png", log_scale=config["log_scale"])
                 num_function_evaluation(all_gbest_vals, config["n_agents"], f"{test_save_path}/{function_id}_num_evaluations.png", log_scale=config["log_scale"])
