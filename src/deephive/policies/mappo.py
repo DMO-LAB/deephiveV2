@@ -49,7 +49,20 @@ class Memory:
         del self.is_terminals[:]
         del self.logprobs[:]
         del self.std_obs[:]
+        
+        
+class DynamicScaleLayer(nn.Module):
+    def __init__(self, initial_scale=10.0, min_scale=0.1, decay_rate=0.99):
+        super(DynamicScaleLayer, self).__init__()
+        self.scale = initial_scale
+        self.min_scale = min_scale
+        self.decay_rate = decay_rate
+    
+    def forward(self, x):
+        return x * self.scale
 
+    def update_scale(self):
+        self.scale = max(self.min_scale, self.scale * self.decay_rate)
 
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim: int, action_dim: int,  layer_size: List, 
@@ -64,13 +77,16 @@ class ActorCritic(nn.Module):
             action_std_init: Initial standard deviation for the action distribution.
             variable_std: Whether the standard deviation should be fixed or variable.  
         """
-
+        # Add dynamic scaling layer
+        self.dynamic_scale = DynamicScaleLayer()
+        
         self.actor = nn.Sequential(
             nn.Linear(obs_dim, layer_size[0]),
-            nn.Tanh(),
+            nn.Sigmoid(),
             nn.Linear(layer_size[0], layer_size[1]),
-            nn.Tanh(),
+            nn.LeakyReLU(),
             nn.Linear(layer_size[1], action_dim),
+            #self.dynamic_scale  # Add dynamic scaling layer
         )
         
         self.critic = nn.Sequential(
@@ -85,7 +101,10 @@ class ActorCritic(nn.Module):
         self.variable_std=variable_std
         self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)   #action_std is a constant
         self.init_action_std = action_std_init
-          
+    
+    def update_dynamic_scale(self):
+        self.dynamic_scale.update_scale()
+        
     def set_action_std(self, new_action_std : float):
                 self.action_var = torch.full(
                     (self.action_dim,), new_action_std * new_action_std).to(device)

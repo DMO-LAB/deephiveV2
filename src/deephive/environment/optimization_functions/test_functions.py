@@ -4,9 +4,10 @@ from deephive.environment.commons.heat_exchanger import HeatExchanger, params
 from deephive.environment.commons.objective_functions import sphere_function, cosine_mixture, ackley_function, rosenbrock_function, gaussian_peak
 from typing import Tuple, Callable, Dict, Any
 import sys 
-from deephive.environment.optimization_functions.cec2017 import functions
-
-all_functions = functions.all_functions
+# from deephive.environment.optimization_functions.cec2017 import functions
+from cec2017.functions import all_functions
+from deephive.environment.optimization_functions.benchmark_functions import *
+# all_functions = functions.all_functions
 
 
 class Tracker():
@@ -16,7 +17,7 @@ class Tracker():
         self.function_values = []
         
     def __call__(self, z):
-        self.count += 1
+        self.count += len(z)
         self.function_values.append(z)
     
     def reset(self):
@@ -92,7 +93,7 @@ class SphereFunction(OptimizationFunctionBase):
         self.tracker = Tracker()
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        z = sphere_function(params)
+        z = -sphere_function(params)
         self.tracker(z)
         return z
 
@@ -231,7 +232,7 @@ class CEC17(OptimizationFunctionBase):
         self.negative = negative
 
     def evaluate(self, params: np.ndarray) -> np.ndarray:
-        z = all_functions[self.function_id](params, negative=self.negative)
+        z = -all_functions[self.function_id](params)
         self.tracker(z)
         return z
 
@@ -243,3 +244,26 @@ class CEC17(OptimizationFunctionBase):
     
     def __str__(self):
         return f"CEC17 Function {self.function_id}"
+    
+
+class BenchmarkFunctions(OptimizationFunctionBase):
+    def __init__(self, function_id: int, negative: bool = True, **kwargs):
+        self.tracker = Tracker()
+        self.negative = negative    
+        function_selector = FunctionSelector()
+        self.function = function_selector.functions[function_id]
+        
+    def evaluate(self, params: np.ndarray) -> np.ndarray:
+        z = -self.function["func"](params) if self.negative else self.function["func"](params)
+        self.tracker(z)
+        return z
+    
+    def bounds(self, dim) -> Tuple[np.ndarray, np.ndarray]:
+        lower_bound = self.function['domain'][0]
+        upper_bound = self.function['domain'][1]
+        return np.array([lower_bound for _ in range(dim)]), np.array([upper_bound for _ in range(dim)])
+    
+    def optimal_value(self, dim=None) -> float:
+        global_min = self.function['global_min']
+        return -global_min if self.negative else global_min
+    

@@ -48,10 +48,73 @@ class OptimizationEnv(gym.Env):
         self.config = config
         self.setup_config()
         
+    def initialize_neighborhoods(self, topology_type):
+        self.neighborhoods = []
+        if topology_type == 'global':
+            self.neighborhoods = [list(range(self.n_agents)) for _ in range(self.n_agents)]
+            
+        elif topology_type == 'ring':
+            for i in range(self.n_agents):
+                neighborhood_indices = list(range(i - self.neighborhood_size, i)) + \
+                                       list(range(i + 1, i + 1 + self.neighborhood_size))
+                neighborhood_indices = [index % self.n_agents for index in neighborhood_indices]
+                self.neighborhoods.append(neighborhood_indices)
+                
+        elif topology_type == 'von_neumann':
+            # Assuming a square grid for simplicity
+            grid_side = int(np.sqrt(self.n_agents))
+            assert grid_side**2 == self.n_agents, "n_agents must be a perfect square for von Neumann topology"
+            for i in range(self.n_agents):
+                x, y = i % grid_side, i // grid_side
+                neighbors = []
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < grid_side and 0 <= ny < grid_side:
+                        neighbors.append(ny * grid_side + nx)
+                self.neighborhoods.append(neighbors)
+                
+        elif topology_type == 'star':
+            best_index = 0  # This could be dynamic based on your algorithm's state
+            for i in range(self.n_agents):
+                self.neighborhoods.append([best_index] if i != best_index else list(range(self.n_agents)))
+                
+        elif topology_type == 'random':
+            for i in range(self.n_agents):
+                # Ensure we don't include the particle itself in its neighborhood
+                neighborhood_indices = np.random.choice([x for x in range(self.n_agents) if x != i], 
+                                                        self.neighborhood_size, replace=False).tolist()
+                self.neighborhoods.append(neighborhood_indices)
+                
+        else:
+            raise ValueError(f"Unknown topology type: {topology_type}")
+
+        
+    # def initialize_neighborhoods(self):
+    #     self.neighborhoods = []
+    #     for i in range(self.n_agents):
+    #         neighborhood_indices = list(range(i - self.neighborhood_size, i)) + list(range(i + 1, i + 1 + self.neighborhood_size))
+    #         neighborhood_indices = [index % self.n_agents for index in neighborhood_indices]  # Ensure indices are within bounds
+    #         self.neighborhoods.append(neighborhood_indices)
+    
+    def compute_lbest(self):
+        self.lbest_positions = np.zeros((self.n_agents, self.n_dim))
+        for i in range(self.n_agents):
+            neighborhood_fitnesses = self.state[:, -1][self.neighborhoods[i]]
+            best_neighbor_idx = self.neighborhoods[i][np.argmax(neighborhood_fitnesses)]
+            self.lbest_positions[i] = self.state[best_neighbor_idx, :-1]
+            
+    def permute_lbest(self, particle_index):
+        # Apply a permutation to the lbest of the selected particle
+        # This is a simplification; in reality, you might want to shuffle the entire neighborhood
+        neighbor_indices = self.neighborhoods[particle_index]
+        np.random.shuffle(neighbor_indices)
+        self.lbest_positions[particle_index] = self.state[neighbor_indices[0], :-1]
+        
     def setup_config(self):
         # Configuration code from the original __init__ method
         try:
             self.env_name = self.config["env_name"]
+            self.function_id = self.config["function_id"]
             self.objective_function:OptimizationFunctionBase = getattr(importlib.import_module(".barrel", "deephive.environment.optimization_functions"), self.config["objective_function"])(function_id=self.config["function_id"], negative=self.config["negative"])
             self.n_agents = self.config["n_agents"]
             self.n_dim = self.config["n_dim"]
@@ -68,6 +131,7 @@ class OptimizationEnv(gym.Env):
             self.scaler_helper = ScalingHelper()
             self.render_helper = Render(self)
             self.use_gbest = self.config["use_gbest"]
+            self.use_lbest = self.config["use_lbest"]
             self.use_optimal_value = self.config["use_optimal_value"]
             self.use_surrogate = self.config["use_surrogate"] if "use_surrogate" in self.config else False
             self.debug = self.config["debug"] if "debug" in self.config else False
@@ -75,6 +139,9 @@ class OptimizationEnv(gym.Env):
             self.split_ratio = self.config["split_ratio"] if "split_ratio" in self.config else 0.5  
             self.log_scale = self.config["log_scale"] if "log_scale" in self.config else False
             self.include_gbest = self.config["include_gbest"] if "include_gbest" in self.config else False
+            self.neighborhood_size = self.config["neighborhood_size"] if "neighborhood_size" in self.config else 3
+            self.topology_type = self.config["topology_type"] if "topology_type" in self.config else "ring"
+            
         except KeyError as e:
             raise KeyError(f"Key {e} not found in config file.")
 
@@ -105,7 +172,8 @@ class OptimizationEnv(gym.Env):
 
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, dtype=np.float64)
         self.observation_space = spaces.Box(low=self.low, high=self.high, dtype=np.float64)
-
+        self.initialize_neighborhoods(self.topology_type)
+        
     def __str__(self):
         return f"OptimizationEnv: {self.env_name} with {self.n_agents} agents in {self.n_dim} dimensions"
     
@@ -113,13 +181,8 @@ class OptimizationEnv(gym.Env):
     def reset(self):
         self.current_step = 0
         self._reset_variables()
-        self.state = self._generate_init_state()
-        self._update_env_state()
-        self.prev_state = self.state.copy()
-        self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
-        self.pbest = self._get_actual_state()
-        self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
-        self._update_pbest()
+        self._generate_init_state()
+        self.objective_function.tracker.reset()
     
         if self.config["use_grid"]:
             self.grid_points = initialize_grid(self.bounds, resolution=self.grid_resolution, n_dim=self.n_dim) 
@@ -133,55 +196,10 @@ class OptimizationEnv(gym.Env):
             _, self.agents_pos_std = self.surrogate.evaluate(actual_samples[:, :-1], scale=True)
             self.prev_agents_pos_std = self.agents_pos_std.copy()
         
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, include_gbest=self.include_gbest)
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, 
+                                                                    include_gbest=self.include_gbest, include_lbest=self.use_lbest)
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
         return observation
-    
-    
-    # create a method to deepcopy the environment
-    def deepcopy(self):
-        """ Create a deep copy of the environment
-        Returns:
-            env: deep copy of the environment
-        """
-        _ = self.reset()
-        env = OptimizationEnv(self.config)
-        env.state = self.state.copy()
-        env.current_step = self.current_step
-        env.prev_state = self.prev_state.copy()
-        env.prev_agents_pos = self.prev_agents_pos.copy()
-        env.obj_values = self.obj_values.copy()
-        env.best_obj_value = self.best_obj_value
-        env.worst_obj_value = self.worst_obj_value
-        env.pbest = self.pbest.copy()
-        env.gbest = self.gbest.copy()
-        env.state_history = self.state_history.copy()
-        env.gbest_history = self.gbest_history.copy()
-        env.evaluated_points = self.evaluated_points.copy()
-        env.use_gbest = self.use_gbest
-        env.use_optimal_value = self.use_optimal_value
-        env.use_surrogate = self.use_surrogate
-        env.scaler_helper = self.scaler_helper
-        env.render_helper = self.render_helper
-        env.observation_schemes = self.observation_schemes
-        env.reward_schemes = self.reward_schemes
-        env.ep_length = self.ep_length
-        env.opt_bound = self.opt_bound
-        env.freeze = self.freeze
-        env.opt_value = self.opt_value
-        env.n_agents = self.n_agents
-        env.n_dim = self.n_dim
-        env.bounds = self.bounds
-        env.low = self.low
-        env.high = self.high
-        env.action_low = self.action_low
-        env.action_high = self.action_high
-        env.action_space = self.action_space
-        env.observation_space = self.observation_space
-        env.optimization_type = self.optimization_type
-        env.debug = self.debug
-        env.split_ratio = self.split_ratio
-        return env
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
         """
@@ -190,8 +208,6 @@ class OptimizationEnv(gym.Env):
         assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         self.prev_state = self.state.copy()
         self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
-        if self.use_surrogate:
-            _ , self.prev_agents_pos_std = self.surrogate.evaluate(self.prev_agents_pos, scale=True)
         self.prev_obj_values = self.obj_values.copy()
         self.best_agent = np.argmin(self.obj_values) if self.optimization_type == "minimize" else np.argmax(self.obj_values)
         # Apply the action to the state
@@ -222,7 +238,8 @@ class OptimizationEnv(gym.Env):
         agents_done = np.zeros(self.n_agents, dtype=bool) if not self.done else np.ones(self.n_agents, dtype=bool)
         # self.surrogate_error = self.surrogate.evaluate_accuracy(self.objective_function.evaluate)
         reward = self.reward_schemes.compute_reward()
-        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, include_gbest=self.include_gbest)
+        observation = self.observation_schemes.generate_observation(pbest=self.pbest.copy(), use_gbest=self.use_gbest, ratio=self.split_ratio, 
+                                                                    include_gbest=self.include_gbest, include_lbest=self.use_lbest)
         self.state_history[:, self.current_step, -2] = observation[1][0].flatten()
 
         info = self._get_info()
@@ -237,21 +254,22 @@ class OptimizationEnv(gym.Env):
         return observation, reward, agents_done, info
 
     
-    def render(self, type: str = "state",fps=1, file_path: Optional[str] = None):
+    def render(self, type: str = "state",fps=1, file_path: Optional[str] = None, **kwargs):
         """ Render the environment
         Args:
             type: type of rendering : "state" or "history"
         """
+        optimal_positons = kwargs.get("optimal_positions", None)
         try:
             if type == "state":
-                self.render_helper.render_state(file_path)
+                self.render_helper.render_state(file_path, optimal_positions=optimal_positons)
             elif type == "history":
-                self.render_helper.render_state_history(file_path=file_path, fps=fps)
+                self.render_helper.render_state_history(file_path=file_path, fps=fps, optimal_positions=optimal_positons)
             elif type == "surrogate":
-                self.surrogate.plot_surrogate(save_dir=file_path)
+                self.surrogate.plot_surrogate(save_dir=file_path, **kwargs)
 
             elif type == "surrogate_variance":
-                self.surrogate.plot_variance(save_dir=file_path)
+                self.surrogate.plot_variance(save_dir=file_path, **kwargs)
             else:
                 raise ValueError("type should be either 'state' or 'history'")
         except Exception as e:
@@ -342,7 +360,7 @@ class OptimizationEnv(gym.Env):
         else:
             return []
         
-    def _generate_init_state(self):
+    def _generate_init_state(self, count=False):
         """ Generate a random initial state for all agents
         Returns:
             init_state: initial state of all agents
@@ -355,8 +373,21 @@ class OptimizationEnv(gym.Env):
         # get the objective value of the initial position
         self.obj_values = self.objective_function.evaluate(params=init_pos)
         # combine the position and objective value
-        init_obs = np.append(init_pos, self.obj_values.reshape(-1, 1), axis=1)
-        return init_obs
+        self.state = np.append(init_pos, self.obj_values.reshape(-1, 1), axis=1)
+        self._update_env_state()
+        self.prev_state = self.state.copy()
+        self.prev_agents_pos = self._get_actual_state()[:, :-1] # get the previous agents position
+        self.pbest = self._get_actual_state()
+        self.gbest = self.pbest[np.argmin(self.pbest[:, -1])] if self.optimization_type == "minimize" else self.pbest[np.argmax(self.pbest[:, -1])]
+        self._update_pbest()
+        if count:
+            self.current_step += 1
+            
+    def _get_scaled_pbest(self):
+        pbest_scaled = np.zeros_like(self.pbest)
+        pbest_scaled[:, :2] = self.scaler_helper.scale(self.pbest[:, :2], self.min_pos, self.max_pos)
+        pbest_scaled[:, -1] = self.scaler_helper.scale(self.pbest[:,-1], self.worst_obj_value, self.best_obj_value, self.log_scale)
+        return pbest_scaled
     
     def _get_actual_state(self, state: Optional[np.ndarray] = None) -> np.ndarray:
         """ Get the actual state of the agents by rescaling the state to the original bounds
@@ -401,7 +432,7 @@ class OptimizationEnv(gym.Env):
             self.obj_values, self.worst_obj_value, self.best_obj_value, log_scale=self.log_scale)
         
         # assert that the normalized state is within the bounds [0, 1]
-        assert np.all((self.state >= 0) & (self.state <= 1)), "State is not within the bounds [0, 1]"
+        assert np.all((self.state >= 0) & (self.state <= 1)), f"State is not within the bounds [0, 1]: {self.state}"
         
     def _update_pbest(self):
         # # update the pbest and gbest

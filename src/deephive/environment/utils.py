@@ -15,10 +15,12 @@ plt.rcParams['figure.figsize'] = [10, 10]
 plt.rcParams['figure.dpi'] = 120
 plt.rcParams['font.size'] = 12
 
+
 class ScalingHelper:
     """
     A class that provides methods for scaling and rescaling values.
     """
+
     @staticmethod
     def scale(d, d_min, d_max, log_scale=False):
         """
@@ -28,140 +30,65 @@ class ScalingHelper:
             d (float): The value to be scaled.
             d_min (float): The minimum value of the range.
             d_max (float): The maximum value of the range.
+            log_scale (bool): Whether to apply logarithmic scaling.
 
         Returns:
             float: The scaled value between 0 and 1.
         """
-        
         if log_scale:
+            # Ensure d_max is less than 0 for log10 scaling of negative values
+            d_max = np.minimum(d_max, -1e-10)
+            d = np.where(d == 0, -1e-10, d)  # Replace 0 with -1e-10 to avoid log(0)
+            
             d = np.log10(-d)
-            d_min_modifies = np.log10(-d_max)
-            d_max_modifies = np.log10(-d_min)
-            d_min = d_min_modifies
-            d_max = d_max_modifies
-        # ensure that the values has the same decimal precision
-        scaled_d = (d - d_min) / ((d_max - d_min) + 1e-10)
-        # ROUND THE VALUE TO 4 DECIMAL PLACES
-        scaled_d = np.round(scaled_d, 4)
-        if log_scale:
-            scaled_d = 1 - scaled_d
-        return scaled_d
+            d_min_modified = np.log10(-d_max)  # Inverted due to negative log scaling
+            d_max_modified = np.log10(-d_min)
+            
+            scaled_d = (d - d_min_modified) / (d_max_modified - d_min_modified) + 1e-10  # Add small value to avoid division by zero
+        else:
+            scaled_d = (d - d_min) / (d_max - d_min) + 1e-10  # Add small value to avoid division by zero   
         
+        scaled_d = np.round(scaled_d, 4)  # Round to 4 decimal places
+        if log_scale:
+            scaled_d = 1 - scaled_d  # Invert scaling direction for logarithmic scale
+        
+        # if any value in scaled_d is greater than 1 or less than 0, or NaN, raise an error
+        if np.any(scaled_d > 1) or np.any(scaled_d < 0) or np.any(np.isnan(scaled_d)):
+            print(f"Scaling failed for d={d}, d_min={d_min}, d_max={d_max}, log_scale={log_scale}")
+            raise ValueError("Scaling failed")
+        
+        return scaled_d
+
     @staticmethod
     def rescale(d, d_min, d_max, log_scale=False):
         """
-        Rescales a value between the given minimum and maximum values to its original range.
+        Rescales a value to its original range.
 
         Args:
             d (float): The value to be rescaled.
             d_min (float): The minimum value of the range.
             d_max (float): The maximum value of the range.
+            log_scale (bool): Whether the original scaling was logarithmic.
 
         Returns:
-            float: The rescaled value between d_min and d_max.
+            float: The rescaled value.
         """
         if log_scale:
-            d = -10**(1-d)
-            d_min = np.log10(-d_max)
-            d_max = np.log10(-d_min)
-        
-        rescaled_d = d_min + (d_max - d_min) * d
+            # Adjust d_min and d_max for logarithmic scale
+            d_max = np.minimum(d_max, -1e-10)
+            d_min_modifies = np.log10(-d_min)
+            d_max_modifies = np.log10(-d_max)
+
+            # Apply inverse of the scaling transformation
+            d = d * (d_max_modifies - d_min_modifies) + d_min_modifies
+            rescaled_d = -10 ** d  # Inverse of log10 scaling
+        else:
+            # Linear scaling inverse
+            rescaled_d = d_min + (d_max - d_min) * d
 
         return rescaled_d
+
     
-
-
-# class StdController:
-#     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
-#         self.num_agents = num_agents
-#         self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
-#         self.role_std = role_std
-#         self.decay_rate = decay_rate
-#         self.min_std = min_std
-#         self.max_std = max_std
-#         self.iteration_num = 0
-
-#     def update_roles(self, roles):
-#         # roles: list of 0s and 1s indicating the role of each agent
-#         for dim in range(len(self.std)):
-#             self.std[dim] = [
-#                 self.role_std['exploiter'] if roles[agent_id] == 1 else self.role_std['explorer'] for agent_id in range(self.num_agents)
-#             ]
-            
-#     def decay_std(self, iteration):
-#         # Optionally decay std based on the iteration number
-#         decay_factor = self.decay_rate ** iteration
-#         self.std = [[max(self.min_std, min(s * decay_factor, self.max_std)) for s in self.std[dim]] for dim in range(len(self.std))]
-
-#     def get_std(self, agent_id):
-#         self.iteration_num += 1
-#         # Get the current std for a specific agent
-#         return self.std[agent_id]
-    
-#     def get_all_std(self, roles=None):
-#         # Get the current std for all agents
-#         if roles is not None:
-#             self.update_roles(roles)
-#         return self.std
-# class StdController:
-#     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
-#         self.num_agents = num_agents
-#         self.n_dim = n_dim
-#         self.role_std = role_std
-#         self.decay_rate = decay_rate
-#         self.min_std = min_std
-#         self.max_std = max_std
-#         self.iteration_num = 0
-#         # Initialize std with explorer role for all dimensions and agents
-#         self.std = [[role_std['explorer']] * num_agents for _ in range(n_dim)]
-#         # Track decayed std for each role
-#         self.decayed_role_std = {role: std_val for role, std_val in role_std.items()}
-#         # Keep track of current roles
-#         self.current_roles = [[0] * num_agents for _ in range(n_dim)]
-
-#     def update_roles(self, roles):
-#         # Update only the std of agents whose roles have changed in each dimension
-#         for dim in range(self.n_dim):
-#             for agent_id in range(self.num_agents):
-#                 if roles[dim][agent_id] != self.current_roles[dim][agent_id]:
-#                     new_role = 'exploiter' if roles[dim][agent_id] == 1 else 'explorer'
-#                     # Use decayed std for the new role
-#                     self.std[dim][agent_id] = self.decayed_role_std[new_role]
-#             self.current_roles[dim] = roles[dim].copy()
-
-#     def decay_std(self):
-#         # Decay std based on the iteration number
-#         decay_factor = self.decay_rate ** self.iteration_num
-#         for role in self.decayed_role_std:
-#             self.decayed_role_std[role] = max(self.min_std, min(self.decayed_role_std[role] * decay_factor, self.max_std))
-#         for dim in range(self.n_dim):
-#             for agent_id in range(self.num_agents):
-#                 role = 'exploiter' if self.current_roles[dim][agent_id] == 1 else 'explorer'
-#                 # Update std with decayed std for the current role
-#                 self.std[dim][agent_id] = max(self.min_std, min(self.std[dim][agent_id] * decay_factor, self.max_std))
-#         self.iteration_num += 1
-            
-    
-#     def get_std(self, agent_id):
-#         # Get the current std for a specific agent across all dimensions
-#         return [self.std[dim][agent_id] for dim in range(self.n_dim)]
-
-#     def get_all_std(self, roles=None, std=None):
-#         # Get the current std for all agents across all dimensions
-#         if std is not None:
-#             return np.array([[std] * self.num_agents for _ in range(self.n_dim)])
-#         if roles is not None:
-#             self.update_roles(roles)
-#         return np.array(self.std)
-    
-#     def reset_std(self):
-#         # Reset std for all agents to the initial std
-#         self.std = [[self.role_std['explorer']] * self.num_agents for _ in range(self.n_dim)]
-#         self.decayed_role_std = {role: std_val for role, std_val in self.role_std.items()}
-#         self.current_roles = [[0] * self.num_agents for _ in range(self.n_dim)]
-#         self.iteration_num = 0
-
-import numpy as np
 
 class StdController:
     def __init__(self, num_agents, n_dim, role_std={'explorer': 1.0, 'exploiter': 0.5}, decay_rate=0.99, min_std=0.01, max_std=0.5):
@@ -408,13 +335,15 @@ class Render:
     """
     def __init__(self, env):
         self.env = env
+    
         
-    def render_state(self, file_path: Optional[str] = None):
+    def render_state(self, file_path: Optional[str] = None, **kwargs):
+        self.optimal_position = kwargs.get("optimal_positions", None)
         if self.env.n_dim > 2:
             raise ValueError("Cannot render state for n_dim > 2")
         
         if self.env.n_dim == 1:
-            self._render_state_1d(file_path )
+            self._render_state_1d(file_path)
         else:
             self._render_state_2d(file_path)
             
@@ -423,6 +352,9 @@ class Render:
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = self.env.objective_function.evaluate(x)
         ax.plot(x, y)
+        # plot the optimal position if given
+        if self.optimal_position is not None:
+            ax.axvline(self.optimal_position, color="red", linestyle="--", label="Optimal Position")
         ax.set_xlim(self.env.bounds[0], self.env.bounds[1])
         ax.set_ylim(self.env.bounds[0], self.env.bounds[1])
         ax.set_xlabel("x")
@@ -441,7 +373,10 @@ class Render:
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         X, Y = np.meshgrid(x, y)
-        Z = self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape)
+        if self.env.log_scale: 
+            Z = np.log10(-self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape))
+        else:
+            Z = self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape)
         ax.contour(X, Y, Z, 50)
         ax.set_xlim(self.env.bounds[0][0], self.env.bounds[1][0])
         ax.set_ylim(self.env.bounds[0][1], self.env.bounds[1][1])
@@ -455,13 +390,22 @@ class Render:
         previous_state = self.env.state_history[:, self.env.current_step - 1, :-2]
         exploiter_id = np.where(roles == 1)[0]
         non_exploiter_id = np.isin(np.arange(len(state)), exploiter_id, invert=True)
-        ax.scatter(state[exploiter_id, 0], state[exploiter_id, 1], c="red", s=100, marker="*", edgecolors="black", label="Exploiter's points", alpha=1)
-        ax.scatter(state[non_exploiter_id, 0], state[non_exploiter_id, 1], c="green", s=100, marker="^", edgecolors="black", label="Explorer's points", alpha=1)
+        ax.scatter(state[exploiter_id, 0], state[exploiter_id, 1], c="red", s=20, marker="*", edgecolors="black", label="Exploiter's points", alpha=1)
+        ax.scatter(state[non_exploiter_id, 0], state[non_exploiter_id, 1], c="green", s=20, marker="^", edgecolors="black", label="Explorer's points", alpha=1)
+        # add a text of it particle index at the position of the particle
+        for i, txt in enumerate(range(len(state))):
+            ax.text(state[i, 0], state[i, 1], str(i), fontsize=14)
         
         # plot a line between the previous state and the current state
         for i in range(len(state)):
             ax.plot([previous_state[i, 0], state[i, 0]], [previous_state[i, 1], state[i, 1]], c="black", alpha=0.5)
+        
+        # plot the optimal position if given
+        if self.optimal_position is not None:
+            ax.scatter(self.optimal_position[0], self.optimal_position[1], c="blue", s=300, marker="o", edgecolors="black", label="Optimal Position")
+        
         ax.legend()
+        
         
         if file_path is not None:
             plt.savefig(file_path)
@@ -469,7 +413,8 @@ class Render:
             plt.show()
         
     
-    def render_state_history(self, file_path: str, fps: int = 10):
+    def render_state_history(self, file_path: str, fps: int = 10, **kwargs):
+        self.optimal_position = kwargs.get("optimal_positions", None)
         if self.env.n_dim > 2:
             raise ValueError("Cannot render state for n_dim > 2")
         
@@ -483,6 +428,8 @@ class Render:
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = self.env.objective_function.evaluate(x)
         ax.plot(x, y)
+        if self.optimal_position is not None:
+            ax.axvline(self.optimal_position, color="red", linestyle="--", label="Optimal Position")
         ax.set_xlim(self.env.bounds[0], self.env.bounds[1])
         ax.set_ylim(self.env.bounds[0], self.env.bounds[1])
         ax.set_xlabel("x")
@@ -491,7 +438,9 @@ class Render:
         scat = ax.scatter([], [], c="red", s=10)
         
         def animate(i):
-            scat.set_offsets(self.env.state_history[i])
+            scat.set_offsets(self.env.state_history[i]) 
+            if self.optimal_position is not None:
+                ax.axvline(self.optimal_position, color="red", linestyle="--", label="Optimal Position")
             return scat,
         
         anim = animation.FuncAnimation(fig, animate, frames=len(self.env.state_history), interval=1000/fps, blit=True)
@@ -502,8 +451,13 @@ class Render:
         x = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         y = np.linspace(self.env.bounds[0], self.env.bounds[1], 1000)
         X, Y = np.meshgrid(x, y)
-        Z = self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape)
+        if self.env.log_scale:
+            Z = np.log10(-self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape))
+        else:
+            Z = self.env.objective_function.evaluate(np.array([X.flatten(), Y.flatten()]).T).reshape(X.shape)
         ax.contour(X, Y, Z, 50)
+        if self.optimal_position is not None:
+            ax.scatter(self.optimal_position[0], self.optimal_position[1], c="green", s=300, marker="o", edgecolors="black", label="Optimal Position")
         ax.set_xlim(self.env.bounds[0][0], self.env.bounds[1][0])
         ax.set_ylim(self.env.bounds[0][1], self.env.bounds[1][1])
         ax.set_xlabel("x")
@@ -515,18 +469,17 @@ class Render:
         text = ax.text(0.05, 0.95, "", transform=ax.transAxes)
         self.previous_state_history = self.env.state_history[:, 0, :-2]
         
+        
         def animate(i):
             scat.set_offsets(self.env.state_history[:, i, :-2])
             text.set_text(f"Iteration: {i}")
-            
             # plot a line between the previous state and the current state
             for j in range(len(self.env.state_history)):
-                ax.plot([self.previous_state_history[j, 0], self.env.state_history[j, i, 0]], [self.previous_state_history[j, 1], self.env.state_history[j, i, 1]], c="black", alpha=0.2)
+                ax.plot([self.previous_state_history[j, 0], self.env.state_history[j, i, 0]], [self.previous_state_history[j, 1], self.env.state_history[j, i, 1]], c="black", alpha=0.1)
+                
             self.previous_state_history = self.env.state_history[:, i, :-2]
             # clear the line between the previous state and the current state
-            
-            
-            
+        
             # use different colors for the particles based on their role - red for closer half, blue for farther half
             scat.set_color(["red" if role == 1 else "blue" for role in self.env.state_history[:, i, -2]])
     

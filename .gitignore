@@ -25,4 +25,9 @@ run.log
 slurm*
 *put*.txt
 
+notebooks/test_results
+notebooks/training_results
+notebooks/new_test_results
+notebooks/pso_results
+new_test_results/
 

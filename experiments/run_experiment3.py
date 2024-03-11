@@ -250,7 +250,6 @@ def run_experiment_concurrently(env, agent_policy, config, exp_name, save_gif=Fa
 
     np.save(result_path + "gbestVals.npy", np.array(gbestVals))
     if config['plot_gbest']:
-            
                 num_function_evaluation(fopt=gbestVals ,n_agents=env.n_agents, save_dir=result_path + "num_function_evaluations.png", opt_value=opt_value,
                                         log_scale=False, plot_error_bounds=True, title=title)
                 
@@ -356,7 +355,7 @@ if __name__ == "__main__":
     parser.add_argument('--dynamic_split', action='store_true')
     parser.add_argument('--use_split_intervals', action='store_true')
     parser.add_argument('--split_ratio', type=float, default=0.5)
-    parser.add_argument('--function_id', type=int, default=0)
+    parser.add_argument('--function_id', type=str, default=0)
     parser.add_argument('--n_dim', type=int, default=2)
 
     
